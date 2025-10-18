@@ -15,7 +15,8 @@ Project Information
 Framework: PyQt6
 Database: SQLite (library.db)
 Executable: Included (Library_Tracker.exe) – created using PyInstaller
-Command for Executable: pyinstaller --noconfirm --clean --onefile --windowed --icon=library.ico --add-data "library.db;." --add-data "library.ico;." --add-data "token.pickle;." --hidden-import "google.auth.transport.requests" --hidden-import "google_auth_oauthlib.flow" --hidden-import "gspread" --hidden-import "requests" main.py
+Command for Executable: pyinstaller --noconfirm --clean --onefile --windowed --icon=library.ico --add-data "library.db;." --add-data "library.ico;." --add-data "token.pickle;." --hidden-import "google.auth.transport.requests" --hidden-import "google_auth_oauthlib.flow" --hidden-import "gspread" --hidden-import "requests" --hidden-import "matplotlib" --hidden-import "matplotlib.pyplot" main.py
+
 
 Library_project/
 │
@@ -63,7 +64,7 @@ Option 1: Run Using Python Source Files
 
 Install dependencies:
 
-pip install gspread google-auth-oauthlib google-auth requests PyQt6
+pip install gspread google-auth-oauthlib google-auth requests PyQt6 matplotlib
 
 
 Run the main application:

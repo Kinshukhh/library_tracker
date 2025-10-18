@@ -9,13 +9,14 @@ from dialogs import AddEditBookDialog,AddEditStudentDialog
 from PyQt6.QtWidgets import (
     QWidget, QMainWindow, QMessageBox, QLabel, QLineEdit, QPushButton,
     QVBoxLayout, QHBoxLayout, QStackedWidget, QTableWidget, QTableWidgetItem,
-    QHeaderView, QGroupBox, QFormLayout, QComboBox, QDateEdit, QFileDialog,QProgressBar,QDialog,QApplication,QInputDialog
+    QHeaderView, QGroupBox, QFormLayout, QComboBox, QDateEdit, QFileDialog,QProgressBar,QDialog,QApplication,QInputDialog,QFrame,QScrollArea
 )
 from PyQt6.QtCore import Qt, QDate, QTimer,pyqtSignal,QRunnable,QObject,QThreadPool
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QIcon,QFont
 from db_manager import DatabaseManager
 import sys
-
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
 def resource_path(relative_path):
     """Get absolute path to resource, works for dev and PyInstaller."""
     if hasattr(sys, "_MEIPASS"):
@@ -438,24 +439,129 @@ class MainWindow(QMainWindow):
     # -------------------------
     # Dashboard
     # -------------------------
+
     def create_dashboard_page(self):
         w = QWidget()
-        layout = QVBoxLayout()
-        w.setLayout(layout)
-        h = QLabel("<h2>Dashboard</h2>")
-        layout.addWidget(h)
+        layout = QVBoxLayout(w)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(20)
 
-        self.lbl_total_books = QLabel()
-        self.lbl_total_students = QLabel()
-        self.lbl_issued_books = QLabel()
-        self.lbl_overdue_list = QLabel("<b>Overdue:</b><br/><i>None</i>")
+        header = QLabel("<h1>📊 Library Dashboard</h1>")
+        header.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(header)
+        summary_layout = QHBoxLayout()
+        layout.addLayout(summary_layout)
 
-        layout.addWidget(self.lbl_total_books)
-        layout.addWidget(self.lbl_total_students)
-        layout.addWidget(self.lbl_issued_books)
-        layout.addWidget(self.lbl_overdue_list)
+        def make_card(title, label_ref, desc=""):
+            card = QFrame()
+            card.setFrameShape(QFrame.Shape.StyledPanel)
+            v = QVBoxLayout(card)
+            t = QLabel(f"<b>{title}</b>")
+            t.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            label_ref.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            label_ref.setFont(QFont("Arial", 18, QFont.Weight.Bold))
+            desc_lbl = QLabel(desc)
+            desc_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            v.addWidget(t)
+            v.addWidget(label_ref)
+            v.addWidget(desc_lbl)
+            return card
+        self.lbl_total_books = QLabel("0")
+        self.lbl_total_students = QLabel("0")
+        self.lbl_issued_books = QLabel("0")
+        self.lbl_overdue_books = QLabel("0")
+        summary_layout.addWidget(make_card("📚 Total Books", self.lbl_total_books))
+        summary_layout.addWidget(make_card("🎓 Total Students", self.lbl_total_students))
+        summary_layout.addWidget(make_card("📦 Issued Books", self.lbl_issued_books))
+        summary_layout.addWidget(make_card("⚠️ Overdue", self.lbl_overdue_books))
+        c = self.dbm.conn.cursor()
+        c.execute("SELECT IFNULL(SUM(quantity), 0) FROM books")
+        total_books = c.fetchone()[0]
+        c.execute("SELECT COUNT(*) FROM students")
+        total_students = c.fetchone()[0]
+        c.execute("SELECT COUNT(*) FROM issued_books WHERE status='Issued'")
+        issued_books = c.fetchone()[0]
+
+        today = date.today().strftime("%Y-%m-%d")
+        c.execute("""
+        SELECT COUNT(*) FROM issued_books 
+        WHERE status='Issued' AND expected_return_date < ?
+    """, (today,))
+        overdue_books = c.fetchone()[0]
+        self.lbl_total_books.setText(str(total_books))
+        self.lbl_total_students.setText(str(total_students))
+        self.lbl_issued_books.setText(str(issued_books))
+        self.lbl_overdue_books.setText(str(overdue_books))
+        charts_layout = QHBoxLayout()
+        layout.addLayout(charts_layout)
+
+        def make_fig(title=""):
+            fig = Figure(figsize=(4, 3))
+            ax = fig.add_subplot(111)
+            fig.subplots_adjust(left=0.15, right=0.95, top=0.85, bottom=0.2)
+            return fig, ax
+        fig1, ax1 = make_fig("Books Issued per Month")
+        canvas1 = FigureCanvas(fig1)
+
+        months = [date(2025, i, 1).strftime("%b") for i in range(1, 13)]
+        issued_data = []
+        for i in range(1, 13):
+            month_str = f"{i:02d}"
+            year_str = str(date.today().year)
+            c.execute("""
+                SELECT COUNT(*) FROM issued_books
+                WHERE strftime('%m', issue_date)=? AND strftime('%Y', issue_date)=?
+            """, (month_str, year_str))
+            issued_data.append(c.fetchone()[0])
+
+        ax1.bar(months, issued_data, color="#007bff")
+        ax1.set_ylabel("No. of Books")
+        ax1.set_title("Books Issued per Month")
+        charts_layout.addWidget(canvas1)
+        fig2, ax2 = make_fig("Book Availability")
+        canvas2 = FigureCanvas(fig2)
+        available_books = total_books - issued_books
+        ax2.pie(
+            [issued_books, available_books],
+            labels=["Issued", "Available"],
+            autopct="%1.1f%%",
+            colors=["#ff6b6b", "#51cf66"],
+        )
+        ax2.set_title("Book Availability")
+        charts_layout.addWidget(canvas2)
+        overdue_title = QLabel("<h3>📅 Overdue Books</h3>")
+        layout.addWidget(overdue_title)
+
+        overdue_scroll = QScrollArea()
+        overdue_scroll.setWidgetResizable(True)
+        overdue_container = QWidget()
+        overdue_layout = QVBoxLayout(overdue_container)
+
+        c.execute("""
+            SELECT s.name, b.title, ib.expected_return_date
+            FROM issued_books ib
+            JOIN students s ON ib.student_id=s.student_id
+            JOIN books b ON ib.book_id=b.book_id
+            WHERE ib.status='Issued' AND ib.expected_return_date < ?
+            ORDER BY ib.expected_return_date ASC
+        """, (today,))
+        overdue_books_list = c.fetchall()
+
+        if overdue_books_list:
+            for s in overdue_books_list:
+                lbl = QLabel(f"🔸 <b>{s[0]}</b> - {s[1]} (Due: {s[2]})")
+                overdue_layout.addWidget(lbl)
+        else:
+            lbl = QLabel("<i>No overdue books</i>")
+            overdue_layout.addWidget(lbl)
+
+        overdue_scroll.setWidget(overdue_container)
+        layout.addWidget(overdue_scroll)
         layout.addStretch()
+
         return w
+
+
 
     def refresh_dashboard(self):
         books = self.dbm.list_books()
@@ -475,7 +581,7 @@ class MainWindow(QMainWindow):
             html += "</ul>"
             self.lbl_overdue_list.setText(html)
         else:
-            self.lbl_overdue_list.setText("<b>Overdue:</b><br/><i>None</i>")
+            self.lbl_overdue_books.setText("0")   
 
     def check_overdue(self):
         overdue = self.dbm.get_overdue()
