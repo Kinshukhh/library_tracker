@@ -10,8 +10,7 @@ Database: SQLite (library.db)
 How to run:
 Double click on Library_Tracker.exe file in EXE Folder 
 else
-1. pip install PyQt6
-2. pip install gspread google-auth-oauthlib google-auth requests
+1. pip install gspread google-auth-oauthlib google-auth requests matplotlib PyQt6
 2. python main.py
 Default admin login: username=admin password=admin
 

@@ -37,6 +37,7 @@ google-auth |	pip install google-auth	Provides authentication and credential han
 
 requests |	pip install requests	| Sends HTTP requests (used for network operations like uploading/syncing) |	https://requests.readthedocs.io/en/latest/
 
+matplotlib | pip install matplotlib | Creates Graphs and Tables (Visuals) | https://matplotlib.org/devdocs/plot_types/basic/bar.html
 ============================================================
 
 [] Database
