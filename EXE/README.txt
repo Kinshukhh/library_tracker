@@ -1,0 +1,2 @@
+Due to Github Upload Limit .exe could not be uploaded. Therefore run below command in terminal:
+Command for Executable: pyinstaller --noconfirm --clean --onefile --windowed --icon=library.ico --add-data "library.db;." --add-data "library.ico;." --add-data "token.pickle;." --hidden-import "google.auth.transport.requests" --hidden-import "google_auth_oauthlib.flow" --hidden-import "gspread" --hidden-import "requests" main.py
