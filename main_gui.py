@@ -9,7 +9,7 @@ from dialogs import AddEditBookDialog,AddEditStudentDialog
 from PyQt6.QtWidgets import (
     QWidget, QMainWindow, QMessageBox, QLabel, QLineEdit, QPushButton,
     QVBoxLayout, QHBoxLayout, QStackedWidget, QTableWidget, QTableWidgetItem,
-    QHeaderView, QGroupBox, QFormLayout, QComboBox, QDateEdit, QFileDialog,QProgressBar,QDialog,QApplication,QInputDialog,QFrame,QScrollArea
+    QHeaderView, QGroupBox, QFormLayout, QComboBox, QDateEdit, QFileDialog,QProgressBar,QDialog,QApplication,QInputDialog,QFrame,QScrollArea,QSizePolicy
 )
 from PyQt6.QtCore import Qt, QDate, QTimer,pyqtSignal,QRunnable,QObject,QThreadPool
 from PyQt6.QtGui import QIcon,QFont
@@ -139,7 +139,7 @@ class LoginWindow(QWidget):
         self.setWindowIcon(QIcon(resource_path("library.ico")))
         self.resize(360, 180)
         layout = QVBoxLayout()
-
+        
         title = QLabel("<h2>Library Management</h2>")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
@@ -196,9 +196,9 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
         
         nav_layout = QVBoxLayout()
-        nav_layout.setSpacing(6)
-        nav_layout.addWidget(QLabel("<h3>Menu</h3>"))
-        
+        nav_layout.setSpacing(20)
+        nav_layout.addWidget(QLabel("<h1><center>Menu</center></h1>"))
+        nav_layout.setContentsMargins(20, 20, 20, 20)
         # Navigation buttons
         self.btn_dashboard = QPushButton("Dashboard")
         self.btn_books = QPushButton("Books")
@@ -210,12 +210,22 @@ class MainWindow(QMainWindow):
         self.btn_logout = QPushButton("Logout")
         self.btn_sync_drive = QPushButton("Sync to Drive")
         self.btn_google_logout = QPushButton("Logout Google")
-
+        self.btn_dashboard.setFont(QFont('Arial', 15))
+        self.btn_books.setFont(QFont('Arial', 15))
+        self.btn_students.setFont(QFont('Arial', 15))
+        self.btn_issue.setFont(QFont('Arial', 15))
+        self.btn_return.setFont(QFont('Arial', 15))
+        self.btn_reports.setFont(QFont('Arial', 15))
+        self.btn_export.setFont(QFont('Arial', 15))
+        self.btn_logout.setFont(QFont('Arial', 15))
+        self.btn_sync_drive.setFont(QFont('Arial', 15))
+        self.btn_google_logout.setFont(QFont('Arial', 15))
         for b in [self.btn_dashboard, self.btn_books, self.btn_students,
                 self.btn_issue, self.btn_return, self.btn_reports,
                 self.btn_export, self.btn_sync_drive, self.btn_google_logout, 
                 self.btn_logout,]:
             b.setMinimumWidth(160)
+            b.setMinimumHeight(50)
             nav_layout.addWidget(b)
 
         self.btn_sync_drive.clicked.connect(self.sync_to_drive)
@@ -446,7 +456,7 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(20)
 
-        header = QLabel("<h1>📊 Library Dashboard</h1>")
+        header = QLabel("<h1>Library Dashboard</h1>")
         header.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(header)
         summary_layout = QHBoxLayout()
@@ -456,10 +466,10 @@ class MainWindow(QMainWindow):
             card = QFrame()
             card.setFrameShape(QFrame.Shape.StyledPanel)
             v = QVBoxLayout(card)
-            t = QLabel(f"<b>{title}</b>")
+            t = QLabel(f"<h2><b>{title}</b></h2>")
             t.setAlignment(Qt.AlignmentFlag.AlignCenter)
             label_ref.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            label_ref.setFont(QFont("Arial", 18, QFont.Weight.Bold))
+            label_ref.setFont(QFont("Arial", 40, QFont.Weight.Bold))
             desc_lbl = QLabel(desc)
             desc_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             v.addWidget(t)
@@ -529,36 +539,65 @@ class MainWindow(QMainWindow):
         )
         ax2.set_title("Book Availability")
         charts_layout.addWidget(canvas2)
-        overdue_title = QLabel("<h3>📅 Overdue Books</h3>")
+        overdue_title = QLabel("<h2>📅 Overdue Books</h2>")
         layout.addWidget(overdue_title)
 
         overdue_scroll = QScrollArea()
         overdue_scroll.setWidgetResizable(True)
+        overdue_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        overdue_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
         overdue_container = QWidget()
         overdue_layout = QVBoxLayout(overdue_container)
+        overdue_container.setLayout(overdue_layout)
+
+        overdue_container.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+
+        item_height = 30
 
         c.execute("""
-            SELECT s.name, b.title, ib.expected_return_date
-            FROM issued_books ib
-            JOIN students s ON ib.student_id=s.student_id
-            JOIN books b ON ib.book_id=b.book_id
-            WHERE ib.status='Issued' AND ib.expected_return_date < ?
-            ORDER BY ib.expected_return_date ASC
-        """, (today,))
-        overdue_books_list = c.fetchall()
-
-        if overdue_books_list:
-            for s in overdue_books_list:
-                lbl = QLabel(f"🔸 <b>{s[0]}</b> - {s[1]} (Due: {s[2]})")
-                overdue_layout.addWidget(lbl)
-        else:
-            lbl = QLabel("<i>No overdue books</i>")
-            overdue_layout.addWidget(lbl)
-
+    SELECT s.name, b.title, ib.expected_return_date
+    FROM issued_books ib
+    JOIN students s ON ib.student_id=s.student_id
+    JOIN books b ON ib.book_id=b.book_id
+    WHERE ib.status='Issued' AND ib.expected_return_date < ?
+    ORDER BY ib.expected_return_date ASC
+""", (today,))
+        rows = c.fetchall()
+        for s in rows:
+            overdue_layout.addWidget(QLabel(f"🔸 <b>{s[0]}</b> - {s[1]} (Due: {s[2]})"))
         overdue_scroll.setWidget(overdue_container)
+        visible_count = min(3, len(rows))
+        visible_height = item_height * visible_count + 10
+        overdue_scroll.setFixedHeight(visible_height)
         layout.addWidget(overdue_scroll)
-        layout.addStretch()
+        new_arrivals_title = QLabel("<h2>🆕 New Arrivals</h2>")
+        layout.addWidget(new_arrivals_title)
+        new_arrivals_scroll = QScrollArea()
+        new_arrivals_scroll.setWidgetResizable(True)
+        new_arrivals_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        new_arrivals_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        new_arrivals_container = QWidget()
+        new_arrivals_layout = QVBoxLayout(new_arrivals_container)
+        new_arrivals_container.setLayout(new_arrivals_layout)
+        item_height = 30
+        c.execute("""
+    SELECT title, author, added_date FROM books
+    ORDER BY added_date DESC
+    LIMIT 10
+""")
+        new_books = c.fetchall()
 
+        for book in new_books:
+            new_arrivals_layout.addWidget(QLabel(f"📗 <b>{book[0]}</b> by {book[1]} (Added: {book[2]})"))
+
+        new_arrivals_scroll.setWidget(new_arrivals_container)
+
+        visible_count = min(3, len(new_books))
+        new_arrivals_scroll.setFixedHeight(item_height * visible_count + 10)
+        layout.addWidget(new_arrivals_scroll)
+
+        layout.addStretch()
         return w
 
 
@@ -567,19 +606,14 @@ class MainWindow(QMainWindow):
         books = self.dbm.list_books()
         students = self.dbm.list_students()
         issued = self.dbm.list_issued()
-        self.lbl_total_books.setText(f"<b>Total distinct book titles:</b> {len(books)}")
-        total_copies = sum([row["quantity"] for row in books])
-        self.lbl_total_books.setText(self.lbl_total_books.text() + f"  |  <b>Total copies available:</b> {total_copies}")
-        self.lbl_total_students.setText(f"<b>Total students:</b> {len(students)}")
-        self.lbl_issued_books.setText(f"<b>Currently issued books:</b> {len(issued)}")
+        self.lbl_total_books.setText(f"{len(books)}")
+        self.lbl_total_students.setText(f"{len(students)}")
+        self.lbl_issued_books.setText(f"{len(issued)}")
 
         overdue = self.dbm.get_overdue()
         if overdue:
-            html = "<b>Overdue:</b><ul>"
-            for (issue_id, book_id, title, student_id, student_name, issue_date, expected_return_date, overdue_days) in overdue:
-                html += f"<li>{title} — {student_name} — overdue by {overdue_days} day(s)</li>"
-            html += "</ul>"
-            self.lbl_overdue_list.setText(html)
+            html = f"<b>{len(overdue)}</b>"
+            self.lbl_overdue_books.setText(html)
         else:
             self.lbl_overdue_books.setText("0")   
 
@@ -590,7 +624,6 @@ class MainWindow(QMainWindow):
             for item in overdue[:5]:
                 msgs.append(f"{item[2]} — {item[4]} (overdue by {item[7]} days)")
             txt = "\n".join(msgs)
-            QMessageBox.information(self, "Overdue Notice", f"Overdue books detected:\n{txt}")
         self.refresh_dashboard()
 
     # -------------------------

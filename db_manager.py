@@ -58,8 +58,10 @@ class DatabaseManager:
         if "barcode" not in existing_cols:
             c.execute("ALTER TABLE books ADD COLUMN barcode TEXT UNIQUE")
             self.conn.commit()
-
-            c.execute("""
+        if "added_date" not in existing_cols:
+            c.execute("ALTER TABLE books ADD COLUMN added_date TEXT")
+            self.conn.commit()
+        c.execute("""
             CREATE TABLE IF NOT EXISTS students (
                 student_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
@@ -102,10 +104,12 @@ class DatabaseManager:
 
     def add_book(self, title, author, category, quantity):
         c = self.conn.cursor()
-        c.execute("INSERT INTO books (title,author,category,quantity) VALUES (?,?,?,?)",
-                  (title, author, category, quantity))
+        added_date = date.today().strftime("%Y-%m-%d")
+        c.execute("INSERT INTO books (title, author, category, quantity, added_date) VALUES (?, ?, ?, ?, ?)",
+              (title, author, category, quantity, added_date))
         self.conn.commit()
         return c.lastrowid
+
 
     def update_book(self, book_id, title, author, category, quantity):
         c = self.conn.cursor()
@@ -281,6 +285,6 @@ class DatabaseManager:
                 res.append((row["issue_id"], row["book_id"], row["title"], row["student_id"], row["name"],
                             row["issue_date"], row["expected_return_date"], overdue_days))
         return res
-
+   
     def close(self):
         self.conn.close()
