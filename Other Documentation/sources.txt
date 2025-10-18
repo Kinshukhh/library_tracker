@@ -1,0 +1,90 @@
+============================================================
+
+Library Management System
+
+============================================================
+
+Developed Using: Python (PyQt6, SQLite, Google Drive API, Google Sheets API)
+
+============================================================
+
+Description:
+A desktop application built with Python and PyQt6 for managing library records, syncing data with Google Drive, and exporting to Google Sheets.
+
+============================================================
+
+[] Python Standard Library Modules
+
+Module	Purpose	Documentation
+os |	File and path handling, environment management |	https://docs.python.org/3/library/os.html
+
+datetime |	Manage and format dates and times|	https://docs.python.org/3/library/datetime.html
+
+pickle |	Save and load serialized Python objects (used for storing Google tokens) |	https://docs.python.org/3/library/pickle.html
+
+============================================================
+
+[] Third-Party Modules (Installed via pip)
+
+Module |	Install Command |	Purpose	Documentation
+PyQt6  |	pip install PyQt6 |	Used to create the graphical user interface (GUI) of the system |	https://pypi.org/project/PyQt6/
+
+gspread  |    pip install gspread |	Connects to and edits Google Sheets using the Google Sheets API |	https://docs.gspread.org/en/latest/
+
+google-auth-oauthlib |	pip install google-auth-oauthlib |	Handles OAuth 2.0 authorization flow for Google login |	https://google-auth-oauthlib.readthedocs.io/en/latest/
+
+google-auth |	pip install google-auth	Provides authentication and credential handling for Google APIs |	https://google-auth.readthedocs.io/en/latest/
+
+requests |	pip install requests	| Sends HTTP requests (used for network operations like uploading/syncing) |	https://requests.readthedocs.io/en/latest/
+
+============================================================
+
+[] Database
+
+Module |	Purpose	Documentation
+sqlite3 |	Local database for storing books, students, and transactions |	https://docs.python.org/3/library/sqlite3.html
+
+============================================================
+
+[] Google API Services Used
+
+Service|	Description	Docs
+Google Drive API |	Upload and sync database backups to Google Drive |	https://developers.google.com/drive/api
+
+Google Sheets API |	Export and manage library records in Google Sheets |	https://developers.google.com/sheets/api
+
+============================================================
+🤖 AI USE NOTICE
+============================================================
+
+Certain parts of this project utilized AI assistance for organization and formatting:
+
+• Code formatting and readability improvements — ChatGPT (OpenAI GPT-5)
+• Formatting and documentation preparation for README.txt and sources.txt — ChatGPT (OpenAI GPT-5)
+• Application logo and GUI window icon design — Sora AI  
+  (Source: https://sora.chatgpt.com/g/gen_01k7s395nbfh48j3xqk996ghmj)
+
+All functional logic, structure, and implementation were created and reviewed by the developer.
+
+============================================================
+
+Developer Information
+
+============================================================
+
+Developed By:
+Kinshuk Aggarwal 
+Chitresh 
+
+============================================================
+School:
+
+Satluj Public School , Sector 4 , Panchkula , Haryana
+
+============================================================
+
+Date of Submission:
+25/10/2025
+
+============================================================
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

@@ -1,0 +1,52 @@
+========================================================
+Summary of README.txt (Recommended to Read README.txt)
+========================================================
+
+Library Management System (Multiple-file)
+Files: db_manager,dialogs,main_gui, -> main.py
+Framework: PyQt6
+Database: SQLite (library.db)
+
+How to run:
+Double click on Library_Tracker.exe file in EXE Folder 
+else
+1. pip install PyQt6
+2. pip install gspread google-auth-oauthlib google-auth requests
+2. python main.py
+Default admin login: username=admin password=admin
+
+============================================================
+🤖 AI USE NOTICE
+============================================================
+
+Certain parts of this project utilized AI assistance for organization and formatting:
+
+• Code formatting and readability improvements — ChatGPT (OpenAI GPT-5)
+• Formatting and documentation preparation for README.txt and sources.txt — ChatGPT (OpenAI GPT-5)
+• Application logo and GUI window icon design — Sora AI  
+  (Source: https://sora.chatgpt.com/g/gen_01k7s395nbfh48j3xqk996ghmj)
+
+All functional logic, structure, and implementation were created and reviewed by the developer.
+
+============================================================
+
+Developer Information
+
+============================================================
+
+Developed By:
+Kinshuk Aggarwal 
+Chitresh 
+
+============================================================
+School:
+
+Satluj Public School , Sector 4 , Panchkula , Haryana
+
+============================================================
+
+Date of Submission:
+25/10/2025
+
+============================================================
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

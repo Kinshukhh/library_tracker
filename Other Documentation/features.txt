@@ -1,0 +1,57 @@
+===========================================================
+
+Features Of Library_Tracker
+
+===========================================================
+
+• Scan book barcode for fast filling  
+• Sync all details to Google Drive for backup  
+• Dashboard view with options:  
+    - Books  
+    - Students  
+    - Issue Book  
+    - Return Books  
+    - Reports  
+    - Export CSV  
+    - Sync to Drive  
+    - Logout Google Account  
+    - Logout  
+• Default login credentials required before starting:  
+    - Username: admin  
+    - Password: admin  
+
+============================================================
+🤖 AI USE NOTICE
+============================================================
+
+Certain parts of this project utilized AI assistance for organization and formatting:
+
+• Code formatting and readability improvements — ChatGPT (OpenAI GPT-5)
+• Formatting and documentation preparation for README.txt and sources.txt — ChatGPT (OpenAI GPT-5)
+• Application logo and GUI window icon design — Sora AI  
+  (Source: https://sora.chatgpt.com/g/gen_01k7s395nbfh48j3xqk996ghmj)
+
+All functional logic, structure, and implementation were created and reviewed by the developer.
+
+============================================================
+
+Developer Information
+
+============================================================
+
+Developed By:
+Kinshuk Aggarwal 
+Chitresh 
+
+============================================================
+School:
+
+Satluj Public School , Sector 4 , Panchkula , Haryana
+
+============================================================
+
+Date of Submission:
+25/10/2025
+
+============================================================
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
