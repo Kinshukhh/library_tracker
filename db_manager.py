@@ -1,9 +1,14 @@
 import sqlite3
 import csv
+import os,sys
 from datetime import date, datetime
 
-DB_FILE = "library.db"
-
+def resource_path(relative_path):
+    """Get absolute path to resource, works for dev and PyInstaller."""
+    if hasattr(sys, "_MEIPASS"):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
+DB_FILE = resource_path("library.db")
 
 class DatabaseManager:
     def __init__(self, db_path=DB_FILE):
@@ -11,6 +16,7 @@ class DatabaseManager:
         self.conn = sqlite3.connect("library.db", check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self._init_db()
+        self.create_settings_table() 
 
     def _init_db(self):
         c = self.conn.cursor()
@@ -233,7 +239,32 @@ class DatabaseManager:
         c.execute("SELECT * FROM issued_books WHERE issue_id=?", (issue_id,))
         return c.fetchone()
 
+    def get_overdue_fee(self):
+        c = self.conn.cursor()
+        c.execute("SELECT value FROM settings WHERE key='overdue_fee'")
+        result = c.fetchone()
+        if result:
+            return float(result[0])
+        return None
 
+    def set_overdue_fee(self, fee):
+        c = self.conn.cursor()
+        c.execute("SELECT COUNT(*) FROM settings WHERE key='overdue_fee'")
+        if c.fetchone()[0] > 0:
+            c.execute("UPDATE settings SET value=? WHERE key='overdue_fee'", (str(fee),))
+        else:
+            c.execute("INSERT INTO settings (key, value) VALUES ('overdue_fee', ?)", (str(fee),))
+        self.conn.commit()
+
+    def create_settings_table(self):
+        c = self.conn.cursor()
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+    """)
+        self.conn.commit()
     def export_table_csv(self, table_name, csv_path):
         c = self.conn.cursor()
         c.execute(f"SELECT * FROM {table_name}")

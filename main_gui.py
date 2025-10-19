@@ -5,18 +5,20 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 import os
 from datetime import datetime, date
-from dialogs import AddEditBookDialog,AddEditStudentDialog
+from dialogs import AddEditBookDialog, AddEditStudentDialog
 from PyQt6.QtWidgets import (
     QWidget, QMainWindow, QMessageBox, QLabel, QLineEdit, QPushButton,
     QVBoxLayout, QHBoxLayout, QStackedWidget, QTableWidget, QTableWidgetItem,
-    QHeaderView, QGroupBox, QFormLayout, QComboBox, QDateEdit, QFileDialog,QProgressBar,QDialog,QApplication,QInputDialog,QFrame,QScrollArea,QSizePolicy
+    QHeaderView, QGroupBox, QFormLayout, QComboBox, QDateEdit, QFileDialog, QProgressBar,
+    QDialog, QApplication, QInputDialog, QFrame, QScrollArea, QSizePolicy
 )
-from PyQt6.QtCore import Qt, QDate, QTimer,pyqtSignal,QRunnable,QObject,QThreadPool
-from PyQt6.QtGui import QIcon,QFont
+from PyQt6.QtCore import Qt, QDate, QTimer, pyqtSignal, QRunnable, QObject, QThreadPool
+from PyQt6.QtGui import QIcon, QFont,QPixmap
 from db_manager import DatabaseManager
 import sys
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+
 def resource_path(relative_path):
     """Get absolute path to resource, works for dev and PyInstaller."""
     if hasattr(sys, "_MEIPASS"):
@@ -35,8 +37,8 @@ def get_user_gsheet_client():
     DROPBOX_LINK = "https://www.dropbox.com/scl/fi/nhghxpmnefc2g45uba15h/credentials.json?rlkey=uqlgnm5lori28rpy8qx6hkuj5&st=8l76xdn6&dl=1"
 
     creds = None
-    if os.path.exists("token.pickle"):
-        with open("token.pickle", "rb") as token:
+    if os.path.exists(resource_path("token.pickle")):
+        with open(resource_path("token.pickle"), "rb") as token:
             creds = pickle.load(token)
 
     if not creds or not creds.valid:
@@ -51,7 +53,7 @@ def get_user_gsheet_client():
             flow = InstalledAppFlow.from_client_config(creds_json, SCOPES)
             creds = flow.run_local_server(port=0)
 
-        with open("token.pickle", "wb") as token:
+        with open(resource_path("token.pickle"), "wb") as token:
             pickle.dump(creds, token)
 
     return gspread.authorize(creds)
@@ -69,14 +71,14 @@ def google_login():
     creds_json = resp.json()
     flow = InstalledAppFlow.from_client_config(creds_json, SCOPES)
     creds = flow.run_local_server(port=0)
-    with open("token.pickle", "wb") as token:
+    with open(resource_path("token.pickle"), "wb") as token:
         pickle.dump(creds, token)
     return creds
 
 def google_logout():
     """Logout Google by deleting local token."""
-    if os.path.exists("token.pickle"):
-        os.remove("token.pickle")
+    if os.path.exists(resource_path("token.pickle")):
+        os.remove(resource_path("token.pickle"))
         return True
     return False
 
@@ -128,8 +130,6 @@ def export_to_user_drive(dbm):
 
     return True
 
-
-
 # Login Window
 class LoginWindow(QWidget):
     def __init__(self, dbm: DatabaseManager):
@@ -178,15 +178,17 @@ class LoginWindow(QWidget):
             QMessageBox.warning(self, "Login failed", "Invalid username or password.")
 
     def open_main(self):
-        self.main = MainWindow(self.dbm)
+        self.main = MainWindow(self.dbm, logged_in_user=self.username.text().strip())
         self.main.show()
         self.close()
 
+
 # Main Application Window
 class MainWindow(QMainWindow):
-    def __init__(self, dbm: DatabaseManager):
+    def __init__(self, dbm: DatabaseManager,logged_in_user: str):
         super().__init__()
         self.dbm = dbm
+        self.logged_in_user = logged_in_user
         self.setWindowTitle("Library Tracker - Dashboard")
         self.setWindowIcon(QIcon(resource_path("library.ico")))
         self.resize(1000, 650)
@@ -421,6 +423,7 @@ class MainWindow(QMainWindow):
             return
         if google_logout():
             QMessageBox.information(self, "Logged Out", "Google account logged out successfully.")
+            self.btn_google_logout.hide()  
         else:
             QMessageBox.warning(self, "Already Logged Out", "No Google account was logged in.")
 
@@ -455,13 +458,26 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(w)
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(20)
+        c = self.dbm.conn.cursor()
+        header_layout = QHBoxLayout()
+        logo = QLabel()
+        pixmap = QPixmap(resource_path("library.ico"))
+        pixmap = pixmap.scaled(80, 80, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        logo.setPixmap(pixmap)
+        logo.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        header_label = QLabel("<h1>Library Dashboard</h1>")
+        header_label.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        header_label.setStyleSheet("margin-left: 10px;")
 
-        header = QLabel("<h1>Library Dashboard</h1>")
-        header.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(header)
-        summary_layout = QHBoxLayout()
+        header_layout.addWidget(logo)
+        header_layout.addWidget(header_label)
+        header_container = QWidget()
+        header_container.setLayout(header_layout)
+        header_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        layout.addWidget(header_container, alignment=Qt.AlignmentFlag.AlignHCenter)
+        
+        summary_layout = QHBoxLayout() 
         layout.addLayout(summary_layout)
-
         def make_card(title, label_ref, desc=""):
             card = QFrame()
             card.setFrameShape(QFrame.Shape.StyledPanel)
@@ -484,7 +500,43 @@ class MainWindow(QMainWindow):
         summary_layout.addWidget(make_card("🎓 Total Students", self.lbl_total_students))
         summary_layout.addWidget(make_card("📦 Issued Books", self.lbl_issued_books))
         summary_layout.addWidget(make_card("⚠️ Overdue", self.lbl_overdue_books))
-        c = self.dbm.conn.cursor()
+        self.lbl_month_income = QLabel("₹0.00")
+        self.lbl_year_income = QLabel("₹0.00")
+
+        fee_layout = QHBoxLayout()
+        layout.addLayout(fee_layout)
+        fee_layout.addWidget(make_card("💸 This Month Income", self.lbl_month_income, "Overdue Fees"))
+        fee_layout.addWidget(make_card("🏦 This Year Income", self.lbl_year_income, "Overdue Fees"))
+        fee_per_day = self.dbm.get_overdue_fee() or 0
+        today = date.today()
+        month_str = today.strftime("%m")
+        year_str = today.strftime("%Y")
+
+        c.execute("""
+    SELECT expected_return_date, actual_return_date
+    FROM issued_books
+    WHERE status='Returned' AND actual_return_date IS NOT NULL
+""")
+        records = c.fetchall()
+
+        month_income = 0
+        year_income = 0
+
+        for r in records:
+            due = datetime.strptime(r[0], "%Y-%m-%d").date()
+            ret = datetime.strptime(r[1], "%Y-%m-%d").date()
+            overdue_days = (ret - due).days
+            if overdue_days > 0:
+                fee = overdue_days * fee_per_day
+                if ret.strftime("%Y") == year_str:
+                    year_income += fee
+                    if ret.strftime("%m") == month_str:
+                        month_income += fee
+
+        self.lbl_month_income.setText(f"₹{month_income:.2f}")
+        self.lbl_year_income.setText(f"₹{year_income:.2f}")
+
+        
         c.execute("SELECT IFNULL(SUM(quantity), 0) FROM books")
         total_books = c.fetchone()[0]
         c.execute("SELECT COUNT(*) FROM students")
@@ -502,8 +554,127 @@ class MainWindow(QMainWindow):
         self.lbl_total_students.setText(str(total_students))
         self.lbl_issued_books.setText(str(issued_books))
         self.lbl_overdue_books.setText(str(overdue_books))
-        charts_layout = QHBoxLayout()
-        layout.addLayout(charts_layout)
+        self.charts_layout = QHBoxLayout()
+        layout.addLayout(self.charts_layout)
+
+       
+        self.new_arrivals_title = QLabel("<h2>🆕 New Arrivals</h2>")
+        layout.addWidget(self.new_arrivals_title)
+        self.new_arrivals_title.setVisible(False)  
+        self.new_arrivals_scroll = QScrollArea()
+        self.new_arrivals_scroll.setWidgetResizable(True)
+        self.new_arrivals_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.new_arrivals_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+        self.new_arrivals_container = QWidget()
+        self.new_arrivals_layout = QVBoxLayout(self.new_arrivals_container)
+        self.new_arrivals_container.setLayout(self.new_arrivals_layout)
+        self.new_arrivals_scroll.setWidget(self.new_arrivals_container)
+        layout.addWidget(self.new_arrivals_scroll)
+        self.new_arrivals_scroll.setVisible(False)  
+        self.overdue_title = QLabel("<h2>📅 Overdue Books</h2>")
+        layout.addWidget(self.overdue_title)
+        self.overdue_title.setVisible(False)  
+        self.overdue_scroll = QScrollArea()
+        self.overdue_scroll.setWidgetResizable(True)
+        self.overdue_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.overdue_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+        self.overdue_container = QWidget()
+        self.overdue_layout = QVBoxLayout(self.overdue_container)
+        self.overdue_container.setLayout(self.overdue_layout)
+        self.overdue_scroll.setWidget(self.overdue_container)
+        layout.addWidget(self.overdue_scroll)
+        self.overdue_scroll.setVisible(False) 
+        layout.addStretch()
+        return w
+
+    def refresh_dashboard(self):
+        c = self.dbm.conn.cursor()
+        today = date.today()
+        month_str = today.strftime("%m")
+        year_str = today.strftime("%Y")
+        c.execute("SELECT IFNULL(SUM(quantity), 0) FROM books")
+        self.lbl_total_books.setText(str(c.fetchone()[0]))
+
+        c.execute("SELECT COUNT(*) FROM students")
+        self.lbl_total_students.setText(str(c.fetchone()[0]))
+
+        c.execute("SELECT COUNT(*) FROM issued_books WHERE status='Issued'")
+        self.lbl_issued_books.setText(str(c.fetchone()[0]))
+
+        c.execute("""
+        SELECT COUNT(*) FROM issued_books
+        WHERE status='Issued' AND expected_return_date < ?
+    """, (today.strftime("%Y-%m-%d"),))
+        self.lbl_overdue_books.setText(str(c.fetchone()[0]))
+        fee_per_day = self.dbm.get_overdue_fee() or 0
+        c.execute("""
+        SELECT expected_return_date, actual_return_date
+        FROM issued_books
+        WHERE status='Returned' AND actual_return_date IS NOT NULL
+    """)
+        records = c.fetchall()
+        month_income = 0
+        year_income = 0
+        for r in records:
+            due = datetime.strptime(r[0], "%Y-%m-%d").date()
+            ret = datetime.strptime(r[1], "%Y-%m-%d").date()
+            overdue_days = (ret - due).days
+            if overdue_days > 0:
+                fee = overdue_days * fee_per_day
+                if ret.strftime("%Y") == year_str:
+                    year_income += fee
+                    if ret.strftime("%m") == month_str:
+                        month_income += fee
+        self.lbl_month_income.setText(f"₹{month_income:.2f}")
+        self.lbl_year_income.setText(f"₹{year_income:.2f}")
+
+        for i in reversed(range(self.overdue_layout.count())):
+            widget = self.overdue_layout.itemAt(i).widget()
+            if widget:
+                widget.setParent(None)
+
+        c.execute("""
+        SELECT s.name, b.title, ib.expected_return_date
+        FROM issued_books ib
+        JOIN students s ON ib.student_id=s.student_id
+        JOIN books b ON ib.book_id=b.book_id
+        WHERE ib.status='Issued' AND ib.expected_return_date < ?
+        ORDER BY ib.expected_return_date ASC
+    """, (today.strftime("%Y-%m-%d"),))
+        rows = c.fetchall()
+        if rows:
+            self.overdue_title.setVisible(True)
+            self.overdue_scroll.setVisible(True)
+            for s in rows:
+                self.overdue_layout.addWidget(QLabel(f"🔸 <b>{s[0]}</b> - {s[1]} (Due: {s[2]})"))
+        else:
+            self.overdue_title.setVisible(False)
+            self.overdue_scroll.setVisible(False)
+        for i in reversed(range(self.new_arrivals_layout.count())):
+            widget = self.new_arrivals_layout.itemAt(i).widget()
+            if widget:
+                widget.setParent(None)
+
+        c.execute("""
+        SELECT title, author, added_date FROM books
+        ORDER BY added_date DESC
+        LIMIT 10
+    """)
+        new_books = c.fetchall()
+        if new_books:
+            self.new_arrivals_title.setVisible(True)
+            self.new_arrivals_scroll.setVisible(True)
+            for book in new_books:
+                self.new_arrivals_layout.addWidget(QLabel(f"📗 <b>{book[0]}</b> by {book[1]} (Added: {book[2]})"))
+        else:
+            self.new_arrivals_title.setVisible(False)
+            self.new_arrivals_scroll.setVisible(False)
+        for i in reversed(range(self.charts_layout.count())):
+            widget = self.charts_layout.itemAt(i).widget()
+            if widget:
+                widget.setParent(None)
 
         def make_fig(title=""):
             fig = Figure(figsize=(4, 3))
@@ -512,110 +683,31 @@ class MainWindow(QMainWindow):
             return fig, ax
         fig1, ax1 = make_fig("Books Issued per Month")
         canvas1 = FigureCanvas(fig1)
-
-        months = [date(2025, i, 1).strftime("%b") for i in range(1, 13)]
+        months = [date(today.year, i, 1).strftime("%b") for i in range(1, 13)]
         issued_data = []
         for i in range(1, 13):
             month_str = f"{i:02d}"
-            year_str = str(date.today().year)
             c.execute("""
                 SELECT COUNT(*) FROM issued_books
                 WHERE strftime('%m', issue_date)=? AND strftime('%Y', issue_date)=?
-            """, (month_str, year_str))
+            """, (month_str, str(today.year)))
             issued_data.append(c.fetchone()[0])
-
         ax1.bar(months, issued_data, color="#007bff")
         ax1.set_ylabel("No. of Books")
         ax1.set_title("Books Issued per Month")
-        charts_layout.addWidget(canvas1)
+        self.charts_layout.addWidget(canvas1)
         fig2, ax2 = make_fig("Book Availability")
         canvas2 = FigureCanvas(fig2)
-        available_books = total_books - issued_books
+        available_books = int(self.lbl_total_books.text()) - int(self.lbl_issued_books.text())
         ax2.pie(
-            [issued_books, available_books],
+            [int(self.lbl_issued_books.text()), available_books],
             labels=["Issued", "Available"],
             autopct="%1.1f%%",
-            colors=["#ff6b6b", "#51cf66"],
+            colors=["#ff6b6b", "#51cf66"]
         )
         ax2.set_title("Book Availability")
-        charts_layout.addWidget(canvas2)
-        overdue_title = QLabel("<h2>📅 Overdue Books</h2>")
-        layout.addWidget(overdue_title)
+        self.charts_layout.addWidget(canvas2)
 
-        overdue_scroll = QScrollArea()
-        overdue_scroll.setWidgetResizable(True)
-        overdue_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        overdue_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-
-        overdue_container = QWidget()
-        overdue_layout = QVBoxLayout(overdue_container)
-        overdue_container.setLayout(overdue_layout)
-
-        overdue_container.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
-
-        item_height = 30
-
-        c.execute("""
-    SELECT s.name, b.title, ib.expected_return_date
-    FROM issued_books ib
-    JOIN students s ON ib.student_id=s.student_id
-    JOIN books b ON ib.book_id=b.book_id
-    WHERE ib.status='Issued' AND ib.expected_return_date < ?
-    ORDER BY ib.expected_return_date ASC
-""", (today,))
-        rows = c.fetchall()
-        for s in rows:
-            overdue_layout.addWidget(QLabel(f"🔸 <b>{s[0]}</b> - {s[1]} (Due: {s[2]})"))
-        overdue_scroll.setWidget(overdue_container)
-        visible_count = min(3, len(rows))
-        visible_height = item_height * visible_count + 10
-        overdue_scroll.setFixedHeight(visible_height)
-        layout.addWidget(overdue_scroll)
-        new_arrivals_title = QLabel("<h2>🆕 New Arrivals</h2>")
-        layout.addWidget(new_arrivals_title)
-        new_arrivals_scroll = QScrollArea()
-        new_arrivals_scroll.setWidgetResizable(True)
-        new_arrivals_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        new_arrivals_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        new_arrivals_container = QWidget()
-        new_arrivals_layout = QVBoxLayout(new_arrivals_container)
-        new_arrivals_container.setLayout(new_arrivals_layout)
-        item_height = 30
-        c.execute("""
-    SELECT title, author, added_date FROM books
-    ORDER BY added_date DESC
-    LIMIT 10
-""")
-        new_books = c.fetchall()
-
-        for book in new_books:
-            new_arrivals_layout.addWidget(QLabel(f"📗 <b>{book[0]}</b> by {book[1]} (Added: {book[2]})"))
-
-        new_arrivals_scroll.setWidget(new_arrivals_container)
-
-        visible_count = min(3, len(new_books))
-        new_arrivals_scroll.setFixedHeight(item_height * visible_count + 10)
-        layout.addWidget(new_arrivals_scroll)
-
-        layout.addStretch()
-        return w
-
-
-
-    def refresh_dashboard(self):
-        books = self.dbm.list_books()
-        students = self.dbm.list_students()
-        issued = self.dbm.list_issued()
-        self.lbl_total_books.setText(f"{len(books)}")
-        self.lbl_total_students.setText(f"{len(students)}")
-        self.lbl_issued_books.setText(f"{len(issued)}")
-
-        overdue = self.dbm.get_overdue()
-        if overdue:
-            html = f"<b>{len(overdue)}</b>"
-            self.lbl_overdue_books.setText(html)
-        else:
-            self.lbl_overdue_books.setText("0")   
 
     def check_overdue(self):
         overdue = self.dbm.get_overdue()
@@ -694,22 +786,43 @@ class MainWindow(QMainWindow):
         if not bid:
             QMessageBox.warning(self, "No selection", "Please select a book to edit.")
             return
+        password, ok = QInputDialog.getText(
+            self, "Admin Authentication", "Enter your password:", QLineEdit.EchoMode.Password
+        )
+        if not ok:
+            return 
+        if not self.dbm.validate_user(self.logged_in_user, password):
+            QMessageBox.critical(self, "Access Denied", "Incorrect password!")
+            return
         book = self.dbm.get_book(bid)
         dlg = AddEditBookDialog(self.dbm, book=book, parent=self)
         if dlg.exec():
             self.refresh_books_table()
 
+
+
     def delete_selected_book(self):
         bid = self.get_selected_book_id()
         if not bid:
             QMessageBox.warning(self, "No selection", "Please select a book to delete.")
+            return  
+        password, ok = QInputDialog.getText(
+            self, "Admin Authentication", "Enter your password:", QLineEdit.EchoMode.Password
+    )
+        if not ok:
+            return 
+        if not self.dbm.validate_user(self.logged_in_user, password):
+            QMessageBox.critical(self, "Access Denied", "Incorrect password!")
             return
-        confirm = QMessageBox.question(self, "Confirm Delete", "Delete selected book?")
+        confirm = QMessageBox.question(
+            self, "Confirm Delete", "Are you sure you want to delete the selected book?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
         if confirm != QMessageBox.StandardButton.Yes:
             return
         try:
             self.dbm.delete_book(bid)
-            QMessageBox.information(self, "Deleted", "Book deleted.")
+            QMessageBox.information(self, "Deleted", "Book deleted successfully.")
             self.refresh_books_table()
         except Exception as e:
             QMessageBox.critical(self, "Error", str(e))
@@ -798,25 +911,51 @@ class MainWindow(QMainWindow):
         if not sid:
             QMessageBox.warning(self, "No selection", "Please select a student to edit.")
             return
+
+        password, ok = QInputDialog.getText(
+            self, "Admin Authentication", "Enter your password:", QLineEdit.EchoMode.Password
+    )
+        if not ok:
+            return
+        if not self.dbm.validate_user(self.logged_in_user, password):
+            QMessageBox.critical(self, "Access Denied", "Incorrect password!")
+            return
+
         student = self.dbm.get_student(sid)
         dlg = AddEditStudentDialog(self.dbm, student=student, parent=self)
         if dlg.exec():
-            self.refresh_students_table()
+                self.refresh_students_table()
+
 
     def delete_selected_student(self):
         sid = self.get_selected_student_id()
         if not sid:
             QMessageBox.warning(self, "No selection", "Please select a student to delete.")
             return
-        confirm = QMessageBox.question(self, "Confirm Delete", "Delete selected student?")
+
+        password, ok = QInputDialog.getText(
+            self, "Admin Authentication", "Enter your password:", QLineEdit.EchoMode.Password
+    )
+        if not ok:
+            return
+        if not self.dbm.validate_user(self.logged_in_user, password):
+            QMessageBox.critical(self, "Access Denied", "Incorrect password!")
+            return
+
+        confirm = QMessageBox.question(
+            self, "Confirm Delete", "Are you sure you want to delete the selected student?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
         if confirm != QMessageBox.StandardButton.Yes:
             return
+
         try:
             self.dbm.delete_student(sid)
-            QMessageBox.information(self, "Deleted", "Student deleted.")
+            QMessageBox.information(self, "Deleted", "Student deleted successfully.")
             self.refresh_students_table()
         except Exception as e:
             QMessageBox.critical(self, "Error", str(e))
+
 
     # -------------------------
     # Issue Page
@@ -974,9 +1113,22 @@ class MainWindow(QMainWindow):
         if not issue_id:
             QMessageBox.warning(self, "No selection", "Select an issued record to return.")
             return
-        confirm = QMessageBox.question(self, "Confirm Return", "Mark selected book as returned?")
+
+        password, ok = QInputDialog.getText(
+            self, "Admin Authentication", "Enter your password:", QLineEdit.EchoMode.Password
+        )
+        if not ok:
+            return
+        if not self.dbm.validate_user(self.logged_in_user, password):
+            QMessageBox.critical(self, "Access Denied", "Incorrect password!")
+            return
+
+        confirm = QMessageBox.question(
+            self, "Confirm Return", "Mark selected book as returned?"
+        )
         if confirm != QMessageBox.StandardButton.Yes:
             return
+
         try:
             actual = date.today().strftime("%Y-%m-%d")
             self.dbm.return_book(issue_id, actual)
@@ -986,6 +1138,7 @@ class MainWindow(QMainWindow):
             self.refresh_dashboard()
         except Exception as e:
             QMessageBox.critical(self, "Error", str(e))
+
 
     # -------------------------
     # Reports Page
@@ -1000,26 +1153,128 @@ class MainWindow(QMainWindow):
         self.btn_list_all_issues = QPushButton("All Issues")
         self.btn_list_overdue = QPushButton("Overdue")
         self.btn_top_books = QPushButton("Top Books (by past issues)")
+        self.btn_set_overdue_fee = QPushButton("Set Overdue Fee")
         btn_layout.addWidget(self.btn_list_all_issues)
         btn_layout.addWidget(self.btn_list_overdue)
         btn_layout.addWidget(self.btn_top_books)
+        btn_layout.addWidget(self.btn_set_overdue_fee)
         layout.addLayout(btn_layout)
+        fee_layout = QHBoxLayout()
+        fee_layout.addWidget(QLabel("Current Overdue Fee:"))
+        self.lbl_overdue_fee = QLabel("Loading...")
+        fee_layout.addWidget(self.lbl_overdue_fee)
+        fee_layout.addStretch()
+        layout.addLayout(fee_layout)
 
-        self.report_table = QTableWidget(0, 8)
-        self.report_table.setHorizontalHeaderLabels(["Issue ID", "Book", "Student", "Issue Date", "Expected Return", "Returned On", "Status", "Overdue Days"])
+        self.report_table = QTableWidget(0, 9)  
+        self.report_table.setHorizontalHeaderLabels([
+            "Issue ID", "Book", "Student", "Issue Date", "Expected Return", 
+            "Returned On", "Status", "Overdue Days", "Fee"
+        ])
         self.report_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.report_table)
 
         self.btn_list_all_issues.clicked.connect(self.report_all_issues)
         self.btn_list_overdue.clicked.connect(self.report_overdue)
         self.btn_top_books.clicked.connect(self.report_top_books)
+        self.btn_set_overdue_fee.clicked.connect(self.set_overdue_fee)
 
         return w
+    
+    def update_fee_summary(self):
+        c = self.dbm.conn.cursor()
+        fee_per_day = self.dbm.get_overdue_fee() or 0
+        today = date.today()
+        month_str = today.strftime("%m")
+        year_str = today.strftime("%Y")
+        c.execute("""
+        SELECT expected_return_date, actual_return_date
+        FROM issued_books
+        WHERE status='Returned' AND actual_return_date IS NOT NULL
+    """)
+        rows = c.fetchall()
+
+        month_income = 0
+        year_income = 0
+
+        for r in rows:
+            due = datetime.strptime(r["expected_return_date"], "%Y-%m-%d").date()
+            ret = datetime.strptime(r["actual_return_date"], "%Y-%m-%d").date()
+            overdue_days = (ret - due).days
+            if overdue_days > 0:
+                fee = overdue_days * fee_per_day
+                if ret.strftime("%Y") == year_str:
+                    year_income += fee
+                    if ret.strftime("%m") == month_str:
+                        month_income += fee
+        self.lbl_month_income.setText(f"₹{month_income:.2f}")
+        self.lbl_year_income.setText(f"₹{year_income:.2f}")
 
     def refresh_reports_page(self):
+        self.update_overdue_fee_display()
         self.report_all_issues()
 
+    def update_overdue_fee_display(self):
+        """Update the displayed overdue fee"""
+        fee = self.dbm.get_overdue_fee()
+        if fee is not None:
+            self.lbl_overdue_fee.setText(f"₹{fee:.2f} per day")
+        else:
+            self.lbl_overdue_fee.setText("Not set")
+
+    def set_overdue_fee(self):
+
+        password, ok = QInputDialog.getText(
+            self, "Admin Authentication", "Enter your password:", QLineEdit.EchoMode.Password
+    )
+        if not ok:
+            return
+        if not self.dbm.validate_user(self.logged_in_user, password):
+            QMessageBox.critical(self, "Access Denied", "Incorrect password!")
+            return
+
+        current_fee = self.dbm.get_overdue_fee()
+        if current_fee is None:
+            current_fee = 1.0 
+        fee, ok = QInputDialog.getDouble(
+            self, 
+            "Set Overdue Fee", 
+            "Enter daily overdue fee per book:",
+            value=current_fee,
+            min=0.0,
+            max=100000.0,
+            decimals=2
+        )
+
+        if ok:
+            try:
+                self.dbm.set_overdue_fee(fee)
+                self.update_overdue_fee_display()
+                QMessageBox.information(
+                    self, 
+                    "Fee Updated", 
+                    f"Overdue fee set to ₹{fee:.2f} per day per book."
+                )
+
+                if hasattr(self, 'current_report') and self.current_report == 'overdue':
+                    self.report_overdue()
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to set fee: {str(e)}")
+
+
+    def calculate_overdue_fee(self, overdue_days):
+        """Calculate fee based on overdue days and current fee rate"""
+        if overdue_days <= 0:
+            return 0.0
+        
+        daily_fee = self.dbm.get_overdue_fee()
+        if daily_fee is None:
+            return 0.0
+        
+        return overdue_days * daily_fee
+
     def report_all_issues(self):
+        self.current_report = 'all'
         rows = self.dbm.list_all_issues()
         self.report_table.setRowCount(0)
         for r in rows:
@@ -1032,14 +1287,26 @@ class MainWindow(QMainWindow):
             self.report_table.setItem(idx, 4, QTableWidgetItem(r["expected_return_date"]))
             self.report_table.setItem(idx, 5, QTableWidgetItem(r["actual_return_date"] or ""))
             self.report_table.setItem(idx, 6, QTableWidgetItem(r["status"]))
+            
             overdue = 0
+            fee = 0.0
             if r["status"] == "Issued":
                 expected = datetime.strptime(r["expected_return_date"], "%Y-%m-%d").date()
                 overdue = (date.today() - expected).days
                 overdue = overdue if overdue > 0 else 0
+                fee = self.calculate_overdue_fee(overdue)
+            elif r["actual_return_date"]:
+                expected = datetime.strptime(r["expected_return_date"], "%Y-%m-%d").date()
+                actual = datetime.strptime(r["actual_return_date"], "%Y-%m-%d").date()
+                overdue = (actual - expected).days
+                overdue = overdue if overdue > 0 else 0
+                fee = self.calculate_overdue_fee(overdue)
+            
             self.report_table.setItem(idx, 7, QTableWidgetItem(str(overdue)))
+            self.report_table.setItem(idx, 8, QTableWidgetItem(f"₹{fee:.2f}"))
 
     def report_overdue(self):
+        self.current_report = 'overdue'
         overdue = self.dbm.get_overdue()
         self.report_table.setRowCount(0)
         for item in overdue:
@@ -1054,8 +1321,12 @@ class MainWindow(QMainWindow):
             self.report_table.setItem(idx, 5, QTableWidgetItem(""))
             self.report_table.setItem(idx, 6, QTableWidgetItem("Issued"))
             self.report_table.setItem(idx, 7, QTableWidgetItem(str(overdue_days)))
+        
+            fee = self.calculate_overdue_fee(overdue_days)
+            self.report_table.setItem(idx, 8, QTableWidgetItem(f"₹{fee:.2f}"))
 
     def report_top_books(self):
+        self.current_report = 'top'
         c = self.dbm.conn.cursor()
         c.execute("""
             SELECT b.book_id, b.title, b.author, COUNT(ib.issue_id) AS times_issued
@@ -1074,7 +1345,7 @@ class MainWindow(QMainWindow):
             self.report_table.setItem(idx, 1, QTableWidgetItem(r["title"]))
             self.report_table.setItem(idx, 2, QTableWidgetItem(r["author"] or ""))
             self.report_table.setItem(idx, 3, QTableWidgetItem(str(r["times_issued"])))
-            for col in range(4, 8):
+            for col in range(4, 9):
                 self.report_table.setItem(idx, col, QTableWidgetItem(""))
 
     # -------------------------
@@ -1092,7 +1363,7 @@ class MainWindow(QMainWindow):
         self.refresh_dashboard()
 
     def sync_to_drive(self):
-        if not os.path.exists("token.pickle"):
+        if not os.path.exists(resource_path("token.pickle")):
             choice = QMessageBox.question(
                 self,
                 "Google Login Required",
@@ -1103,6 +1374,7 @@ class MainWindow(QMainWindow):
                 return
             try:
                 google_login()
+                self.btn_google_logout.show()  
                 QMessageBox.information(self, "Login Success", "Logged in successfully! You can now sync.")
             except Exception as e:
                 QMessageBox.critical(self, "Login Failed", f"Error logging in: {e}")
@@ -1146,4 +1418,3 @@ class MainWindow(QMainWindow):
             return
         self.dbm.close()
         event.accept()
-
