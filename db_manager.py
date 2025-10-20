@@ -81,25 +81,7 @@ class DatabaseManager:
         self.conn.commit()
 
         c.execute("SELECT COUNT(*) FROM books")
-        if c.fetchone()[0] == 0:
-            sample_books = [
-                ("Mathematics - Class 10", "R.S. Aggarwal", "Textbook", 5),
-                ("Science - Class 9", "Lakhmir Singh", "Textbook", 4),
-                ("Python Programming", "John Zelle", "Programming", 2),
-                ("Harry Potter and the Sorcerer's Stone", "J.K. Rowling", "Fiction", 3),
-            ]
-            c.executemany("INSERT INTO books (title,author,category,quantity) VALUES (?,?,?,?)", sample_books)
-            self.conn.commit()
-
         c.execute("SELECT COUNT(*) FROM students")
-        if c.fetchone()[0] == 0:
-            sample_students = [
-                ("Aman Sharma", "10-A", "9876543210"),
-                ("Riya Kapoor", "9-B", "9876501234"),
-                ("Rahul Verma", "11-C", "9123456789")
-            ]
-            c.executemany("INSERT INTO students (name,class,contact) VALUES (?,?,?)", sample_students)
-            self.conn.commit()
 
 
     def validate_user(self, username, password):

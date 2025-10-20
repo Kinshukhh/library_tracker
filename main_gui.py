@@ -88,47 +88,79 @@ class WorkerSignals(QObject):
     success = pyqtSignal(str)
 
 class DriveSyncWorker(QRunnable):
-    def __init__(self, dbm):
+    def __init__(self, dbm, main_window=None):
+        """
+        :param dbm: Database manager
+        :param main_window: Optional reference to main GUI to access Reports page
+        """
         super().__init__()
         self.dbm = dbm
+        self.main_window = main_window
         self.signals = WorkerSignals()
 
     def run(self):
         try:
-            export_to_user_drive(self.dbm)
-            self.signals.success.emit("Library data synced to your Google Drive!")
+            # 1️⃣ Sync database tables
+            self.sync_db_tables()
+
+            # 2️⃣ Sync Reports page if main_window is provided
+            if self.main_window:
+                self.sync_reports_page()
+
+            self.signals.success.emit("Library data and Reports Page synced to Google Drive!")
         except Exception as e:
             self.signals.error.emit(str(e))
         finally:
             self.signals.finished.emit()
 
-def export_to_user_drive(dbm):
-    """Upload local SQLite data to user's Google Drive as Google Sheets."""
-    client = get_user_gsheet_client()
-    tables = ["books", "students", "issued_books", "users"]
+    def sync_db_tables(self):
+        client = get_user_gsheet_client()
+        tables = ["books", "students", "issued_books", "users"]
 
-    for table in tables:
-        sheet_title = f"MyLibrary_{table}"
+        for table in tables:
+            sheet_title = f"MyLibrary_{table}"
+            try:
+                sheet = client.open(sheet_title).sheet1
+                sheet.clear()
+            except gspread.SpreadsheetNotFound:
+                sheet = client.create(sheet_title).sheet1
+
+            c = self.dbm.conn.cursor()
+            c.execute(f"SELECT * FROM {table}")
+            rows = c.fetchall()
+            if not rows:
+                continue
+
+            columns = [col[0] for col in c.description]
+            sheet.append_row(columns)
+            for row in rows:
+                sheet.append_row(list(row))
+
+    def sync_reports_page(self):
+        client = get_user_gsheet_client()
+        sheet_title = "MyLibrary_ReportsPage"
         try:
             sheet = client.open(sheet_title).sheet1
             sheet.clear()
         except gspread.SpreadsheetNotFound:
             sheet = client.create(sheet_title).sheet1
 
-        c = dbm.conn.cursor()
-        c.execute(f"SELECT * FROM {table}")
-        rows = c.fetchall()
+        table = self.main_window.report_table
 
-        if not rows:
-            continue
+        headers = [table.horizontalHeaderItem(i).text() for i in range(table.columnCount())]
+    
+        all_rows = [headers] 
 
-        columns = [col[0] for col in c.description]
-        sheet.append_row(columns)
 
-        for row in rows:
-            sheet.append_row(list(row))
+        for row in range(table.rowCount()):
+            row_data = [
+                table.item(row, col).text() if table.item(row, col) else ""
+                for col in range(table.columnCount())
+         ]
+            all_rows.append(row_data)
 
-    return True
+        sheet.append_rows(all_rows, value_input_option="USER_ENTERED")
+
 
 # Login Window
 class LoginWindow(QWidget):
@@ -698,15 +730,29 @@ class MainWindow(QMainWindow):
         self.charts_layout.addWidget(canvas1)
         fig2, ax2 = make_fig("Book Availability")
         canvas2 = FigureCanvas(fig2)
-        available_books = int(self.lbl_total_books.text()) - int(self.lbl_issued_books.text())
-        ax2.pie(
-            [int(self.lbl_issued_books.text()), available_books],
-            labels=["Issued", "Available"],
-            autopct="%1.1f%%",
-            colors=["#ff6b6b", "#51cf66"]
-        )
+
+        issued_count = int(self.lbl_issued_books.text())
+        total_books = int(self.lbl_total_books.text())
+        available_books = total_books - issued_count
+
+        values = [issued_count, available_books]
+        labels = ["Issued", "Available"]
+
+        if total_books > 0 and sum(values) > 0:
+            ax2.pie(
+                values,
+                labels=labels,
+                autopct="%1.1f%%",
+                colors=["#ff6b6b", "#51cf66"],
+                startangle=90
+            )
+        else:
+            ax2.text(0, 0, "No Data", ha="center", va="center", fontsize=12)
+            ax2.axis("equal")
+
         ax2.set_title("Book Availability")
         self.charts_layout.addWidget(canvas2)
+
 
 
     def check_overdue(self):
@@ -753,6 +799,8 @@ class MainWindow(QMainWindow):
         self.edit_book_btn.clicked.connect(self.edit_selected_book)
         self.delete_book_btn.clicked.connect(self.delete_selected_book)
         self.assign_barcode_btn.clicked.connect(self.assign_barcode_to_book)
+        self.books_table.itemSelectionChanged.connect(self.update_books_buttons_state)
+
         return w
 
     def refresh_books_table(self):
@@ -768,6 +816,22 @@ class MainWindow(QMainWindow):
             self.books_table.setItem(row_idx, 3, QTableWidgetItem(r["category"] or ""))
             self.books_table.setItem(row_idx, 4, QTableWidgetItem(str(r["quantity"])))
             self.books_table.setItem(row_idx, 5, QTableWidgetItem(r["barcode"] or ""))
+    def update_books_buttons_state(self):
+        selected_rows = len(set(item.row() for item in self.books_table.selectedItems()))
+        single_selection = (selected_rows == 1)
+        self.edit_book_btn.setEnabled(single_selection)
+        self.assign_barcode_btn.setEnabled(single_selection)
+        if selected_rows == 0:
+            self.delete_book_btn.setEnabled(False)
+            self.delete_book_btn.setText("Delete")
+        elif selected_rows == 1:
+            self.delete_book_btn.setEnabled(True)
+            self.delete_book_btn.setText("Delete Selected")
+        else:
+            self.delete_book_btn.setEnabled(True)
+            self.delete_book_btn.setText(f"Delete {selected_rows} Books")
+
+
 
     def get_selected_book_id(self):
         sel = self.books_table.selectedItems()
@@ -775,6 +839,15 @@ class MainWindow(QMainWindow):
             return None
         book_id = int(sel[0].text())
         return book_id
+    def get_selected_book_ids(self):
+        """Return a list of all selected book IDs from the table."""
+        selected_rows = set(item.row() for item in self.books_table.selectedItems())
+        book_ids = []
+        for row in selected_rows:
+            item = self.books_table.item(row, 0)  # ID is column 0
+            if item and item.text().strip().isdigit():
+                book_ids.append(int(item.text()))
+        return book_ids
 
     def add_book(self):
         dlg = AddEditBookDialog(self.dbm, parent=self)
@@ -800,32 +873,39 @@ class MainWindow(QMainWindow):
             self.refresh_books_table()
 
 
-
     def delete_selected_book(self):
-        bid = self.get_selected_book_id()
-        if not bid:
-            QMessageBox.warning(self, "No selection", "Please select a book to delete.")
+        book_ids = self.get_selected_book_ids()
+        if not book_ids:
+            QMessageBox.warning(self, "No selection", "Please select book(s) to delete.")
             return  
-        password, ok = QInputDialog.getText(
-            self, "Admin Authentication", "Enter your password:", QLineEdit.EchoMode.Password
-    )
+        password, ok = QInputDialog.getText(self, "Admin Authentication", "Enter your password:", QLineEdit.EchoMode.Password)
         if not ok:
             return 
         if not self.dbm.validate_user(self.logged_in_user, password):
             QMessageBox.critical(self, "Access Denied", "Incorrect password!")
             return
-        confirm = QMessageBox.question(
-            self, "Confirm Delete", "Are you sure you want to delete the selected book?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
+        if len(book_ids) == 1:
+            msg = "Are you sure you want to delete the selected book?"
+        else:
+            msg = f"Are you sure you want to delete {len(book_ids)} selected books?"
+        confirm = QMessageBox.question(self, "Confirm Delete", msg, QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if confirm != QMessageBox.StandardButton.Yes:
             return
-        try:
-            self.dbm.delete_book(bid)
-            QMessageBox.information(self, "Deleted", "Book deleted successfully.")
+        success_count = 0
+        error_messages = []
+        for bid in book_ids:
+            try:
+                self.dbm.delete_book(bid)
+                success_count += 1
+            except Exception as e:
+                error_messages.append(f"Book ID {bid}: {e}")
+        if success_count > 0:
+            QMessageBox.information(self, "Deleted", f"Successfully deleted {success_count} book(s).")
             self.refresh_books_table()
-        except Exception as e:
-            QMessageBox.critical(self, "Error", str(e))
+        if error_messages:
+            QMessageBox.warning(self, "Partial Errors", "\n".join(error_messages))
+
+    
 
     def assign_barcode_to_book(self):
         """Assign or update barcode for selected book"""
@@ -875,6 +955,9 @@ class MainWindow(QMainWindow):
         self.students_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.students_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         layout.addWidget(self.students_table)
+        self.students_table.itemSelectionChanged.connect(self.update_students_buttons_state)
+        self.edit_student_btn.setEnabled(False)
+        self.delete_student_btn.setEnabled(False)
 
         self.add_student_btn.clicked.connect(self.add_student)
         self.edit_student_btn.clicked.connect(self.edit_selected_student)
@@ -893,6 +976,72 @@ class MainWindow(QMainWindow):
             self.students_table.setItem(row_idx, 1, QTableWidgetItem(r["name"]))
             self.students_table.setItem(row_idx, 2, QTableWidgetItem(r["class"] or ""))
             self.students_table.setItem(row_idx, 3, QTableWidgetItem(r["contact"] or ""))
+    def update_students_buttons_state(self):
+        selected_rows = len(set(item.row() for item in self.students_table.selectedItems()))
+        single_selection = (selected_rows == 1)
+        self.edit_student_btn.setEnabled(single_selection)
+        if selected_rows == 0:
+            self.delete_student_btn.setEnabled(False)
+            self.delete_student_btn.setText("Delete")
+        elif selected_rows == 1:
+            self.delete_student_btn.setEnabled(True)
+            self.delete_student_btn.setText("Delete Selected")
+        else:
+            self.delete_student_btn.setEnabled(True)
+            self.delete_student_btn.setText(f"Delete {selected_rows} Students")
+    def get_selected_student_ids(self):
+        sel = self.students_table.selectedItems()
+        if not sel:
+            return []
+        rows = sorted(set(item.row() for item in sel))
+        ids = []
+        for r in rows:
+            item = self.students_table.item(r, 0)
+            if item and item.text().isdigit():
+                ids.append(int(item.text()))
+        return ids
+
+    def delete_selected_student(self):
+        student_ids = self.get_selected_student_ids()
+        if not student_ids:
+            QMessageBox.warning(self, "No selection", "Please select student(s) to delete.")
+            return
+
+        password, ok = QInputDialog.getText(
+        self, "Admin Authentication", "Enter your password:", QLineEdit.EchoMode.Password
+        )
+        if not ok:
+            return
+        if not self.dbm.validate_user(self.logged_in_user, password):
+            QMessageBox.critical(self, "Access Denied", "Incorrect password!")
+            return
+
+        if len(student_ids) == 1:
+            msg = "Are you sure you want to delete the selected student?"
+        else:
+            msg = f"Are you sure you want to delete {len(student_ids)} selected students?"
+
+        confirm = QMessageBox.question(
+            self, "Confirm Delete", msg,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+
+        success_count = 0
+        errors = []
+        for sid in student_ids:
+            try:
+                self.dbm.delete_student(sid)
+                success_count += 1
+            except Exception as e:
+                errors.append(f"Student ID {sid}: {e}")
+
+        if success_count > 0:
+            QMessageBox.information(self, "Deleted", f"Successfully deleted {success_count} student(s).")
+            self.refresh_students_table()
+        if errors:
+            QMessageBox.warning(self, "Partial Errors", "\n".join(errors))
 
     def get_selected_student_id(self):
         sel = self.students_table.selectedItems()
@@ -925,36 +1074,6 @@ class MainWindow(QMainWindow):
         dlg = AddEditStudentDialog(self.dbm, student=student, parent=self)
         if dlg.exec():
                 self.refresh_students_table()
-
-
-    def delete_selected_student(self):
-        sid = self.get_selected_student_id()
-        if not sid:
-            QMessageBox.warning(self, "No selection", "Please select a student to delete.")
-            return
-
-        password, ok = QInputDialog.getText(
-            self, "Admin Authentication", "Enter your password:", QLineEdit.EchoMode.Password
-    )
-        if not ok:
-            return
-        if not self.dbm.validate_user(self.logged_in_user, password):
-            QMessageBox.critical(self, "Access Denied", "Incorrect password!")
-            return
-
-        confirm = QMessageBox.question(
-            self, "Confirm Delete", "Are you sure you want to delete the selected student?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        if confirm != QMessageBox.StandardButton.Yes:
-            return
-
-        try:
-            self.dbm.delete_student(sid)
-            QMessageBox.information(self, "Deleted", "Student deleted successfully.")
-            self.refresh_students_table()
-        except Exception as e:
-            QMessageBox.critical(self, "Error", str(e))
 
 
     # -------------------------
@@ -1082,7 +1201,8 @@ class MainWindow(QMainWindow):
 
         self.return_btn.clicked.connect(self.mark_returned)
         self.return_scan_btn.clicked.connect(self.scan_barcode_for_return)
-
+        self.return_table.itemSelectionChanged.connect(self.update_return_buttons_state)
+        self.return_btn.setEnabled(False) 
         return w
 
     def refresh_return_page(self):
@@ -1107,11 +1227,31 @@ class MainWindow(QMainWindow):
         if not sel:
             return None
         return int(sel[0].text())
+    def update_return_buttons_state(self):
+        selected_count = len(set(item.row() for item in self.return_table.selectedItems()))
+        self.return_btn.setEnabled(selected_count > 0)
+        if selected_count == 0:
+            self.return_btn.setText("Mark as Returned")
+        elif selected_count == 1:
+            self.return_btn.setText("Mark as Returned")
+        else:
+            self.return_btn.setText(f"Mark {selected_count} as Returned")
+    def get_selected_issue_ids(self):
+        sel = self.return_table.selectedItems()
+        if not sel:
+            return []
+        rows = sorted(set(item.row() for item in sel))
+        ids = []
+        for r in rows:
+            item = self.return_table.item(r, 0)
+            if item and item.text().isdigit():
+                ids.append(int(item.text()))
+        return ids
 
     def mark_returned(self):
-        issue_id = self.get_selected_issue_id()
-        if not issue_id:
-            QMessageBox.warning(self, "No selection", "Select an issued record to return.")
+        issue_ids = self.get_selected_issue_ids()
+        if not issue_ids:
+            QMessageBox.warning(self, "No selection", "Select issued record(s) to return.")
             return
 
         password, ok = QInputDialog.getText(
@@ -1123,21 +1263,32 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Access Denied", "Incorrect password!")
             return
 
-        confirm = QMessageBox.question(
-            self, "Confirm Return", "Mark selected book as returned?"
+        msg = (
+        "Mark selected book as returned?" if len(issue_ids) == 1
+        else f"Mark {len(issue_ids)} selected books as returned?"
         )
+        confirm = QMessageBox.question(self, "Confirm Return", msg)
         if confirm != QMessageBox.StandardButton.Yes:
             return
 
-        try:
-            actual = date.today().strftime("%Y-%m-%d")
-            self.dbm.return_book(issue_id, actual)
-            QMessageBox.information(self, "Returned", "Book marked as returned.")
+        success_count = 0
+        errors = []
+
+        actual = date.today().strftime("%Y-%m-%d")
+        for iid in issue_ids:
+            try:
+                self.dbm.return_book(iid, actual)
+                success_count += 1
+            except Exception as e:
+                errors.append(f"Issue ID {iid}: {e}")
+
+        if success_count > 0:
+            QMessageBox.information(self, "Returned", f"{success_count} book(s) marked as returned.")
             self.refresh_return_page()
             self.refresh_books_table()
             self.refresh_dashboard()
-        except Exception as e:
-            QMessageBox.critical(self, "Error", str(e))
+        if errors:
+            QMessageBox.warning(self, "Partial Errors", "\n".join(errors))
 
 
     # -------------------------
@@ -1393,7 +1544,7 @@ class MainWindow(QMainWindow):
         self.wait_dialog.show()
 
         self.threadpool = getattr(self, "threadpool", QThreadPool())
-        worker = DriveSyncWorker(self.dbm)
+        worker = DriveSyncWorker(self.dbm,main_window=self)
         worker.signals.success.connect(self.on_sync_success)
         worker.signals.error.connect(self.on_sync_error)
         worker.signals.finished.connect(self.on_sync_finished)

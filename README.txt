@@ -33,6 +33,8 @@ Library_project/
     └── sources.txt            # Sources for program used  
     └── summary.txt            # Summary of README
 └── token.pickle # Mainly for building .exe usage in code for oauth of Google
+└── Sample Library
+    └── library.db # Sample Library 
 ============================================================
 
 Requirements
