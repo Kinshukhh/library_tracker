@@ -10,10 +10,10 @@ from PyQt6.QtWidgets import (
     QWidget, QMainWindow, QMessageBox, QLabel, QLineEdit, QPushButton,
     QVBoxLayout, QHBoxLayout, QStackedWidget, QTableWidget, QTableWidgetItem,
     QHeaderView, QGroupBox, QFormLayout, QComboBox, QDateEdit, QFileDialog, QProgressBar,
-    QDialog, QApplication, QInputDialog, QFrame, QScrollArea, QSizePolicy
+    QDialog, QApplication, QInputDialog, QFrame, QScrollArea, QSizePolicy,QToolButton, QMenu
 )
 from PyQt6.QtCore import Qt, QDate, QTimer, pyqtSignal, QRunnable, QObject, QThreadPool
-from PyQt6.QtGui import QIcon, QFont,QPixmap
+from PyQt6.QtGui import QIcon, QFont,QPixmap,QAction
 from db_manager import DatabaseManager
 import sys
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -500,9 +500,11 @@ class MainWindow(QMainWindow):
         header_label = QLabel("<h1>Library Dashboard</h1>")
         header_label.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         header_label.setStyleSheet("margin-left: 10px;")
+        
 
         header_layout.addWidget(logo)
         header_layout.addWidget(header_label)
+       
         header_container = QWidget()
         header_container.setLayout(header_layout)
         header_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
@@ -537,12 +539,72 @@ class MainWindow(QMainWindow):
 
         fee_layout = QHBoxLayout()
         layout.addLayout(fee_layout)
-        fee_layout.addWidget(make_card("💸 This Month Income", self.lbl_month_income, "Overdue Fees"))
-        fee_layout.addWidget(make_card("🏦 This Year Income", self.lbl_year_income, "Overdue Fees"))
+        self.cards = {
+    "month_income": make_card("💸 This Month Income", self.lbl_month_income, "Overdue Fees"),
+    "year_income": make_card("🏦 This Year Income", self.lbl_year_income, "Overdue Fees")
+        }
+
+        fee_layout.addWidget(self.cards["month_income"])
+        fee_layout.addWidget(self.cards["year_income"])
+
         fee_per_day = self.dbm.get_overdue_fee() or 0
         today = date.today()
         month_str = today.strftime("%m")
         year_str = today.strftime("%Y")
+        # --- ⚙️ Settings (⋮) Button ---
+        self.settings_button = QToolButton()
+        self.settings_button.setText("⋮")
+        self.settings_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.settings_button.setStyleSheet("font-size: 18px; padding: 4px;")
+
+        menu = QMenu()
+
+# Checkable options for dashboard sections
+        self.option_show_month_income = QAction("Show Month Income", menu, checkable=True, checked=True)
+        self.option_show_year_income = QAction("Show Year Income", menu, checkable=True, checked=True)
+        self.option_show_overdue = QAction("Show Overdue Books", menu, checkable=True, checked=True)
+        self.option_show_new_arrivals = QAction("Show New Arrivals", menu, checkable=True, checked=True)
+        self.option_show_charts = QAction("Show Charts", menu, checkable=True, checked=True)
+
+        menu.addAction(self.option_show_month_income)
+        menu.addAction(self.option_show_year_income)
+        menu.addAction(self.option_show_overdue)
+        menu.addAction(self.option_show_new_arrivals)
+        menu.addAction(self.option_show_charts)
+
+        self.settings_button.setMenu(menu)
+        header_layout.addStretch() 
+        header_layout.addWidget(self.settings_button)
+                    # --- Toggle Visibility Logic ---
+        def toggle_sections():
+        # Cards
+            if hasattr(self, "cards"):
+                self.cards["month_income"].setVisible(self.option_show_month_income.isChecked())
+                self.cards["year_income"].setVisible(self.option_show_year_income.isChecked())
+
+        # Overdue Section
+            if hasattr(self, "overdue_title"):
+                self.overdue_title.setVisible(self.option_show_overdue.isChecked())
+                self.overdue_scroll.setVisible(self.option_show_overdue.isChecked())
+
+        # New Arrivals
+            if hasattr(self, "new_arrivals_title"):
+                self.new_arrivals_title.setVisible(self.option_show_new_arrivals.isChecked())
+                self.new_arrivals_scroll.setVisible(self.option_show_new_arrivals.isChecked())
+
+        # Charts
+            if hasattr(self, "charts_layout"):
+                for i in range(self.charts_layout.count()):
+                    widget = self.charts_layout.itemAt(i).widget()
+                    if widget:
+                        widget.setVisible(self.option_show_charts.isChecked())
+
+    # Connect menu toggles
+        self.option_show_month_income.toggled.connect(toggle_sections)
+        self.option_show_year_income.toggled.connect(toggle_sections)
+        self.option_show_overdue.toggled.connect(toggle_sections)
+        self.option_show_new_arrivals.toggled.connect(toggle_sections)
+        self.option_show_charts.toggled.connect(toggle_sections)
 
         c.execute("""
     SELECT expected_return_date, actual_return_date
