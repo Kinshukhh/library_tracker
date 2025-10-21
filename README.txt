@@ -15,7 +15,7 @@ Project Information
 Framework: PyQt6
 Database: SQLite (library.db)
 Executable: Included (Library_Tracker.exe) – created using PyInstaller
-Command for Executable: pyinstaller --noconfirm --clean --onefile --windowed --icon=library.ico --add-data "library.db;." --add-data "library.ico;." --add-data "token.pickle;." --hidden-import "google.auth.transport.requests" --hidden-import "google_auth_oauthlib.flow" --hidden-import "gspread" --hidden-import "requests" --hidden-import "matplotlib" --hidden-import "matplotlib.pyplot" main.py
+Command for Executable: pyinstaller --noconfirm --clean --onefile --windowed --icon=library.ico --add-data "library.db;." --add-data "library.ico;." --hidden-import "google.auth.transport.requests" --hidden-import "google_auth_oauthlib.flow" --hidden-import "gspread" --hidden-import "requests" --hidden-import "matplotlib" --hidden-import "matplotlib.pyplot" main.py
 
 
 Library_project/
@@ -32,7 +32,7 @@ Library_project/
 └── Other Documentation              # Folder for .txt files
     └── sources.txt            # Sources for program used  
     └── summary.txt            # Summary of README
-└── token.pickle # Mainly for building .exe usage in code for oauth of Google
+└── token.pickle # Usage in code for oauth of Google
 └── Sample Library
     └── library.db # Sample Library 
 ============================================================

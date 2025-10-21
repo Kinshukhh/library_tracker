@@ -160,7 +160,26 @@ class DriveSyncWorker(QRunnable):
             all_rows.append(row_data)
 
         sheet.append_rows(all_rows, value_input_option="USER_ENTERED")
+def is_google_logged_in():
+    """Check if a valid Google login token exists."""
+    token_path = resource_path("token.pickle")
+    if not os.path.exists(token_path):
+        return False
 
+    try:
+        with open(token_path, "rb") as token:
+            creds = pickle.load(token)
+
+        if creds and creds.valid:
+            return True
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+            with open(token_path, "wb") as token:
+                pickle.dump(creds, token)
+            return True
+    except Exception as e:
+        print("Error checking Google login:", e)
+    return False
 
 # Login Window
 class LoginWindow(QWidget):
@@ -291,7 +310,11 @@ class MainWindow(QMainWindow):
         self.btn_reports.clicked.connect(lambda: self.switch_page(5))
         self.btn_export.clicked.connect(self.export_all_csv)
         self.btn_logout.clicked.connect(self.logout)
-        
+        if is_google_logged_in():
+            self.btn_google_logout.show()
+        else:
+            self.btn_google_logout.hide()
+
         self.switch_page(0)
         self.overdue_timer = QTimer()
         self.overdue_timer.timeout.connect(self.check_overdue)
