@@ -9,7 +9,7 @@ from dialogs import AddEditBookDialog, AddEditStudentDialog
 from PyQt6.QtWidgets import (
     QWidget, QMainWindow, QMessageBox, QLabel, QLineEdit, QPushButton,
     QVBoxLayout, QHBoxLayout, QStackedWidget, QTableWidget, QTableWidgetItem,
-    QHeaderView, QGroupBox, QFormLayout, QComboBox, QDateEdit, QFileDialog, QProgressBar,
+    QHeaderView, QGroupBox, QFormLayout, QComboBox, QDateEdit, QFileDialog, QProgressBar,QAbstractItemView,
     QDialog, QApplication, QInputDialog, QFrame, QScrollArea, QSizePolicy,QToolButton, QMenu
 )
 from PyQt6.QtCore import Qt, QDate, QTimer, pyqtSignal, QRunnable, QObject, QThreadPool
@@ -574,7 +574,7 @@ class MainWindow(QMainWindow):
         today = date.today()
         month_str = today.strftime("%m")
         year_str = today.strftime("%Y")
-        # --- ⚙️ Settings (⋮) Button ---
+    
         self.settings_button = QToolButton()
         self.settings_button.setText("⋮")
         self.settings_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
@@ -582,7 +582,6 @@ class MainWindow(QMainWindow):
 
         menu = QMenu()
 
-# Checkable options for dashboard sections
         self.option_show_month_income = QAction("Show Month Income", menu, checkable=True, checked=True)
         self.option_show_year_income = QAction("Show Year Income", menu, checkable=True, checked=True)
         self.option_show_overdue = QAction("Show Overdue Books", menu, checkable=True, checked=True)
@@ -598,31 +597,28 @@ class MainWindow(QMainWindow):
         self.settings_button.setMenu(menu)
         header_layout.addStretch() 
         header_layout.addWidget(self.settings_button)
-                    # --- Toggle Visibility Logic ---
+    
         def toggle_sections():
-        # Cards
+    
             if hasattr(self, "cards"):
                 self.cards["month_income"].setVisible(self.option_show_month_income.isChecked())
                 self.cards["year_income"].setVisible(self.option_show_year_income.isChecked())
 
-        # Overdue Section
             if hasattr(self, "overdue_title"):
                 self.overdue_title.setVisible(self.option_show_overdue.isChecked())
                 self.overdue_scroll.setVisible(self.option_show_overdue.isChecked())
-
-        # New Arrivals
             if hasattr(self, "new_arrivals_title"):
                 self.new_arrivals_title.setVisible(self.option_show_new_arrivals.isChecked())
                 self.new_arrivals_scroll.setVisible(self.option_show_new_arrivals.isChecked())
 
-        # Charts
+
             if hasattr(self, "charts_layout"):
                 for i in range(self.charts_layout.count()):
                     widget = self.charts_layout.itemAt(i).widget()
                     if widget:
                         widget.setVisible(self.option_show_charts.isChecked())
 
-    # Connect menu toggles
+
         self.option_show_month_income.toggled.connect(toggle_sections)
         self.option_show_year_income.toggled.connect(toggle_sections)
         self.option_show_overdue.toggled.connect(toggle_sections)
@@ -793,33 +789,53 @@ class MainWindow(QMainWindow):
             if widget:
                 widget.setParent(None)
 
-        def make_fig(title=""):
-            fig = Figure(figsize=(4, 3))
+        for i in reversed(range(self.charts_layout.count())):
+            widget = self.charts_layout.itemAt(i).widget()
+            if widget:
+                widget.setParent(None)
+
+        def make_dynamic_canvas(title=""):
+            fig = Figure(figsize=(4, 3), dpi=100)
             ax = fig.add_subplot(111)
             fig.subplots_adjust(left=0.15, right=0.95, top=0.85, bottom=0.2)
-            return fig, ax
-        fig1, ax1 = make_fig("Books Issued per Month")
-        canvas1 = FigureCanvas(fig1)
+            canvas = FigureCanvas(fig)
+
+            def on_resize(event=None):
+                w = canvas.width() / canvas.logicalDpiX()
+                h = canvas.height() / canvas.logicalDpiY()
+                fig.set_size_inches(w, h)
+                scale = max(0.5, min(1.5, w / 4)) 
+                for label in (ax.get_xticklabels() + ax.get_yticklabels()):
+                    label.set_fontsize(8 * scale)
+                ax.title.set_fontsize(12 * scale)
+                ax.xaxis.label.set_fontsize(9 * scale)
+                ax.yaxis.label.set_fontsize(9 * scale)
+                fig.tight_layout()
+                canvas.draw_idle()
+
+            canvas.resizeEvent = on_resize  
+            return fig, ax, canvas
+
+        fig1, ax1, canvas1 = make_dynamic_canvas("Books Issued per Month")
         months = [date(today.year, i, 1).strftime("%b") for i in range(1, 13)]
         issued_data = []
         for i in range(1, 13):
-            month_str = f"{i:02d}"
+            m = f"{i:02d}"
             c.execute("""
                 SELECT COUNT(*) FROM issued_books
                 WHERE strftime('%m', issue_date)=? AND strftime('%Y', issue_date)=?
-            """, (month_str, str(today.year)))
+            """, (m, str(today.year)))
             issued_data.append(c.fetchone()[0])
         ax1.bar(months, issued_data, color="#007bff")
         ax1.set_ylabel("No. of Books")
         ax1.set_title("Books Issued per Month")
         self.charts_layout.addWidget(canvas1)
-        fig2, ax2 = make_fig("Book Availability")
-        canvas2 = FigureCanvas(fig2)
+
+        fig2, ax2, canvas2 = make_dynamic_canvas("Book Availability")
 
         issued_count = int(self.lbl_issued_books.text())
         total_books = int(self.lbl_total_books.text())
         available_books = total_books - issued_count
-
         values = [issued_count, available_books]
         labels = ["Issued", "Available"]
 
@@ -837,6 +853,7 @@ class MainWindow(QMainWindow):
 
         ax2.set_title("Book Availability")
         self.charts_layout.addWidget(canvas2)
+
 
 
 
@@ -876,6 +893,7 @@ class MainWindow(QMainWindow):
         action_layout.addWidget(self.assign_barcode_btn)
         layout.addLayout(action_layout)
         self.books_table = QTableWidget(0, 6)
+        self.books_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.books_table.setHorizontalHeaderLabels(["ID", "Title", "Author", "Category", "Quantity", "Barcode"])
         self.books_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.books_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -885,12 +903,12 @@ class MainWindow(QMainWindow):
         self.delete_book_btn.clicked.connect(self.delete_selected_book)
         self.assign_barcode_btn.clicked.connect(self.assign_barcode_to_book)
         self.books_table.itemSelectionChanged.connect(self.update_books_buttons_state)
-
         return w
 
     def refresh_books_table(self):
         q = self.book_search.text().strip()
         rows = self.dbm.list_books(q if q else None)
+        self.books_table.setSortingEnabled(False)
         self.books_table.setRowCount(0)
         for r in rows:
             row_idx = self.books_table.rowCount()
@@ -901,6 +919,7 @@ class MainWindow(QMainWindow):
             self.books_table.setItem(row_idx, 3, QTableWidgetItem(r["category"] or ""))
             self.books_table.setItem(row_idx, 4, QTableWidgetItem(str(r["quantity"])))
             self.books_table.setItem(row_idx, 5, QTableWidgetItem(r["barcode"] or ""))
+        self.books_table.setSortingEnabled(True)
     def update_books_buttons_state(self):
         selected_rows = len(set(item.row() for item in self.books_table.selectedItems()))
         single_selection = (selected_rows == 1)
@@ -1036,6 +1055,7 @@ class MainWindow(QMainWindow):
         layout.addLayout(action_layout)
 
         self.students_table = QTableWidget(0, 4)
+        self.students_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.students_table.setHorizontalHeaderLabels(["ID", "Name", "Class", "Contact"])
         self.students_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.students_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -1043,7 +1063,6 @@ class MainWindow(QMainWindow):
         self.students_table.itemSelectionChanged.connect(self.update_students_buttons_state)
         self.edit_student_btn.setEnabled(False)
         self.delete_student_btn.setEnabled(False)
-
         self.add_student_btn.clicked.connect(self.add_student)
         self.edit_student_btn.clicked.connect(self.edit_selected_student)
         self.delete_student_btn.clicked.connect(self.delete_selected_student)
@@ -1054,6 +1073,7 @@ class MainWindow(QMainWindow):
         q = self.student_search.text().strip()
         rows = self.dbm.list_students(q if q else None)
         self.students_table.setRowCount(0)
+        self.students_table.setSortingEnabled(False)
         for r in rows:
             row_idx = self.students_table.rowCount()
             self.students_table.insertRow(row_idx)
@@ -1061,6 +1081,7 @@ class MainWindow(QMainWindow):
             self.students_table.setItem(row_idx, 1, QTableWidgetItem(r["name"]))
             self.students_table.setItem(row_idx, 2, QTableWidgetItem(r["class"] or ""))
             self.students_table.setItem(row_idx, 3, QTableWidgetItem(r["contact"] or ""))
+        self.students_table.setSortingEnabled(True)
     def update_students_buttons_state(self):
         selected_rows = len(set(item.row() for item in self.students_table.selectedItems()))
         single_selection = (selected_rows == 1)
@@ -1201,10 +1222,10 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(QLabel("<b>Currently Issued Books</b>"))
         self.issued_table = QTableWidget(0, 6)
+        self.issued_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.issued_table.setHorizontalHeaderLabels(["Issue ID", "Book", "Student", "Issue Date", "Expected Return", "Status"])
         self.issued_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.issued_table)
-
         self.issue_btn.clicked.connect(self.issue_book)
         self.issue_refresh_btn.clicked.connect(self.refresh_issue_page)
         self.issue_scan_btn.clicked.connect(self.scan_barcode_for_issue)
@@ -1214,6 +1235,7 @@ class MainWindow(QMainWindow):
     def refresh_issue_page(self):
         self.issue_student_combo.clear()
         students = self.dbm.list_students()
+        self.issued_table.setSortingEnabled(False)
         for s in students:
             self.issue_student_combo.addItem(f"{s['name']} ({s['class']})", s["student_id"])
         self.issue_book_combo.clear()
@@ -1232,7 +1254,7 @@ class MainWindow(QMainWindow):
             self.issued_table.setItem(idx, 3, QTableWidgetItem(r["issue_date"]))
             self.issued_table.setItem(idx, 4, QTableWidgetItem(r["expected_return_date"]))
             self.issued_table.setItem(idx, 5, QTableWidgetItem(r["status"]))
-
+        self.issued_table.setSortingEnabled(True)
     def issue_book(self):
         sid_idx = self.issue_student_combo.currentIndex()
         bid_idx = self.issue_book_combo.currentIndex()
@@ -1279,11 +1301,11 @@ class MainWindow(QMainWindow):
         layout.addLayout(action_layout)
 
         self.return_table = QTableWidget(0, 7)
+        self.return_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.return_table.setHorizontalHeaderLabels(["Issue ID", "Book", "Student", "Issue Date", "Expected Return", "Status", "Overdue Days"])
         self.return_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.return_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         layout.addWidget(self.return_table)
-
         self.return_btn.clicked.connect(self.mark_returned)
         self.return_scan_btn.clicked.connect(self.scan_barcode_for_return)
         self.return_table.itemSelectionChanged.connect(self.update_return_buttons_state)
@@ -1294,6 +1316,7 @@ class MainWindow(QMainWindow):
         q = self.return_search.text().strip()
         rows = self.dbm.list_issued(search=q if q else None)
         self.return_table.setRowCount(0)
+        self.return_table.setSortingEnabled(False)
         for r in rows:
             idx = self.return_table.rowCount()
             self.return_table.insertRow(idx)
@@ -1306,7 +1329,7 @@ class MainWindow(QMainWindow):
             expected = datetime.strptime(r["expected_return_date"], "%Y-%m-%d").date()
             overdue_days = (date.today() - expected).days
             self.return_table.setItem(idx, 6, QTableWidgetItem(str(overdue_days if overdue_days > 0 else 0)))
-
+        self.return_table.setSortingEnabled(True)
     def get_selected_issue_id(self):
         sel = self.return_table.selectedItems()
         if not sel:
@@ -1402,14 +1425,14 @@ class MainWindow(QMainWindow):
         fee_layout.addStretch()
         layout.addLayout(fee_layout)
 
-        self.report_table = QTableWidget(0, 9)  
+        self.report_table = QTableWidget(0, 9) 
+        self.report_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers) 
         self.report_table.setHorizontalHeaderLabels([
             "Issue ID", "Book", "Student", "Issue Date", "Expected Return", 
             "Returned On", "Status", "Overdue Days", "Fee"
         ])
         self.report_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.report_table)
-
         self.btn_list_all_issues.clicked.connect(self.report_all_issues)
         self.btn_list_overdue.clicked.connect(self.report_overdue)
         self.btn_top_books.clicked.connect(self.report_top_books)
@@ -1432,7 +1455,6 @@ class MainWindow(QMainWindow):
 
         month_income = 0
         year_income = 0
-
         for r in rows:
             due = datetime.strptime(r["expected_return_date"], "%Y-%m-%d").date()
             ret = datetime.strptime(r["actual_return_date"], "%Y-%m-%d").date()
@@ -1445,8 +1467,10 @@ class MainWindow(QMainWindow):
                         month_income += fee
         self.lbl_month_income.setText(f"₹{month_income:.2f}")
         self.lbl_year_income.setText(f"₹{year_income:.2f}")
+        
 
     def refresh_reports_page(self):
+        
         self.update_overdue_fee_display()
         self.report_all_issues()
 
@@ -1513,6 +1537,7 @@ class MainWindow(QMainWindow):
         self.current_report = 'all'
         rows = self.dbm.list_all_issues()
         self.report_table.setRowCount(0)
+        self.report_table.setSortingEnabled(False)
         for r in rows:
             idx = self.report_table.rowCount()
             self.report_table.insertRow(idx)
@@ -1540,6 +1565,7 @@ class MainWindow(QMainWindow):
             
             self.report_table.setItem(idx, 7, QTableWidgetItem(str(overdue)))
             self.report_table.setItem(idx, 8, QTableWidgetItem(f"₹{fee:.2f}"))
+            self.report_table.setSortingEnabled(True)
 
     def report_overdue(self):
         self.current_report = 'overdue'

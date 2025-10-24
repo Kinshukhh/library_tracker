@@ -26,7 +26,7 @@ Library_project/
 ├── dialogs.py             # Add/Edit dialogs for books and students
 ├── library.db             # SQLite database file (auto-created if missing)
 ├── EXE                    # Folder for .exe
-    └──  Library_Tracker.exe    # Pre-built executable for quick launch SIZE: (48.3 MB) RAM USAGE: (MAX 100 MB) BUILT ALL LATEST OS
+    └──  Library_Tracker.exe    # Pre-built executable for quick launch SIZE: (113 MB) RAM USAGE: (MAX 100 MB) BUILT ALL LATEST OS
 └── library.ico            # Sora AI made Logo is used as .exe logo (https://sora.chatgpt.com/g/gen_01k7s395nbfh48j3xqk996ghmj)
 └── README.txt              # Documentation file
 └── Other Documentation              # Folder for .txt files
