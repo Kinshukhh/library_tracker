@@ -1,0 +1,11 @@
+
+Application home page
+https://sites.google.com/view/library-tracker/home
+Provide users a link to your home page
+Application privacy policy link
+https://sites.google.com/view/library-tracker/privacy-policy
+Provide users a link to your public privacy policy
+Application terms of service link
+https://sites.google.com/view/library-tracker/terms-conditions
+Youtube Demo link:
+https://www.youtube.com/watch?v=55tEWk2Og_M

@@ -34,8 +34,8 @@ Developer Information
 ============================================================
 
 Developed By:
-Kinshuk Aggarwal 
-Chitresh 
+Kinshuk Aggarwal (Main Developer,XII)
+Chitresh (Co-Developer,XII) 
 
 ============================================================
 School:
