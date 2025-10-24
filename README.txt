@@ -3,7 +3,10 @@
 Library Management System (Multiple-files)
 
 ============================================================
-
+Critical Information :
+ In Sync to Drive while logging in It will show Back to Safety 
+ but Click “Advanced” → “Go to Library Tracker (unsafe)” → then click “Continue” — this step is safe for our school project only and not for public use or production. 
+============================================================
 Overview
 
 The Library Management System is a desktop application built using Python (PyQt6) and SQLite.
@@ -200,8 +203,8 @@ Developer Information
 ============================================================
 
 Developed By:
-Kinshuk Aggarwal 
-Chitresh 
+Kinshuk Aggarwal (Main Developer,XII)
+Chitresh (Co-Developer,XII) 
 
 ============================================================
 School:

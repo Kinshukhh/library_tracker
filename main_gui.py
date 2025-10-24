@@ -18,6 +18,7 @@ from db_manager import DatabaseManager
 import sys
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from matplotlib.ticker import MaxNLocator
 
 def resource_path(relative_path):
     """Get absolute path to resource, works for dev and PyInstaller."""
@@ -820,7 +821,7 @@ class MainWindow(QMainWindow):
         months = [date(today.year, i, 1).strftime("%b") for i in range(1, 13)]
         issued_data = []
         for i in range(1, 13):
-            m = f"{i:02d}"
+            m = f"{i}"
             c.execute("""
                 SELECT COUNT(*) FROM issued_books
                 WHERE strftime('%m', issue_date)=? AND strftime('%Y', issue_date)=?
@@ -829,6 +830,7 @@ class MainWindow(QMainWindow):
         ax1.bar(months, issued_data, color="#007bff")
         ax1.set_ylabel("No. of Books")
         ax1.set_title("Books Issued per Month")
+        ax1.yaxis.set_major_locator(MaxNLocator(integer=True))
         self.charts_layout.addWidget(canvas1)
 
         fig2, ax2, canvas2 = make_dynamic_canvas("Book Availability")
