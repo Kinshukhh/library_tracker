@@ -33,25 +33,4 @@ Certain parts of this project utilized AI assistance for organization and format
 
 All functional logic, structure, and implementation were created and reviewed by the developer.
 
-============================================================
 
-Developer Information
-
-============================================================
-
-Developed By:
-Kinshuk Aggarwal (Main Developer,XII)
-Chitresh (Co-Developer,XII) 
-
-============================================================
-School:
-
-Satluj Public School , Sector 4 , Panchkula , Haryana
-
-============================================================
-
-Date of Submission:
-25/10/2025
-
-============================================================
-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
