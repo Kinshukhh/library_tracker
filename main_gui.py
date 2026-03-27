@@ -65,7 +65,7 @@ def google_login():
         "https://www.googleapis.com/auth/drive",
         "https://www.googleapis.com/auth/spreadsheets"
     ]
-    DROPBOX_LINK = "https://www.dropbox.com/scl/fi/nhghxpmnefc2g45uba15h/credentials.json?rlkey=uqlgnm5lori28rpy8qx6hkuj5&st=8l76xdn6&dl=1"
+    DROPBOX_LINK = "https://www.dropbox.com/example"
     resp = requests.get(DROPBOX_LINK)
     if resp.status_code != 200:
         raise Exception(f"Failed to fetch credentials from Dropbox. Status: {resp.status_code}")
